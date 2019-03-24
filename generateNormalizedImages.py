@@ -162,7 +162,7 @@ def generateConnectedImages(dictionary, path, w, h, thickness):
 
 
 def main():
-    limit = 100
+    limit = 0
     w = 15
     h = 15
     thickness = 2
