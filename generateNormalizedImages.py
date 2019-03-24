@@ -86,6 +86,10 @@ def loadSamplesIntoDictionary(dictionary, directoryPath, limit):
                 if child.tag == '{http://www.w3.org/2003/InkML}annotation' and child.attrib['type'] == 'UI':
                     # Retrieve the unique identifier for this symbol
                     id=child.text
+
+                    # Take the last _'th split as the unique identifier for this sample
+                    elements = id.split("_")
+                    id = elements[len(elements)-1]
                     print("filename = ", filename, ", value = ", child.text, ", type = ", child.attrib['type'])
 
                 if child.tag == '{http://www.w3.org/2003/InkML}trace':
