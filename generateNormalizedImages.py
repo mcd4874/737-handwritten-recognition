@@ -189,7 +189,7 @@ def main():
 
     # Create "connected" images
     generateConnectedImages(symbolsDictionary, "./images/connect/symbols/", w, h, thickness)
-    generateConnectedImages(symbolsDictionary, "./images/connect/junk/", w, h, thickness)
+    generateConnectedImages(junkDictionary, "./images/connect/junk/", w, h, thickness)
     return
 
 main()
