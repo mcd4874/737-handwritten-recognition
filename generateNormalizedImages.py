@@ -172,20 +172,24 @@ def main():
     thickness = 2
 
     # Initialize the dictionary
-    sampleDictionary = dict()
+    symbolsDictionary = dict()
+    junkDictionary = dict()
 
     # Load Symbols and Junk samples into the common dictionary, indexed by UI "unique identifier?"
-    loadSamplesIntoDictionary(sampleDictionary, "./trainingSymbols/", limit)
-    loadSamplesIntoDictionary(sampleDictionary, "./trainingJunk/", limit)
+    loadSamplesIntoDictionary(symbolsDictionary, "./trainingSymbols/", limit)
+    loadSamplesIntoDictionary(junkDictionary, "./trainingJunk/", limit)
 
     # Perform normalization to all samples in our dictionary
-    normalizeSamples(sampleDictionary, w, h)
+    normalizeSamples(symbolsDictionary, w, h)
+    normalizeSamples(junkDictionary, w, h)
 
     # Create "no-connect" images
-    generateNoConnectImages(sampleDictionary, "./images/no_connect/", w, h)
+    generateNoConnectImages(symbolsDictionary, "./images/no_connect/symbols/", w, h)
+    generateNoConnectImages(junkDictionary, "./images/no_connect/junk/", w, h)
 
     # Create "connected" images
-    generateConnectedImages(sampleDictionary, "./images/connect/", w, h, thickness)
+    generateConnectedImages(symbolsDictionary, "./images/connect/symbols/", w, h, thickness)
+    generateConnectedImages(symbolsDictionary, "./images/connect/junk/", w, h, thickness)
     return
 
 main()
