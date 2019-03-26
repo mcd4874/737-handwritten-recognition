@@ -164,9 +164,12 @@ def generateConnectedImages(dictionary, path, w, h, thickness):
 
     return
 
+# Generates a Features stack ordered by id=0, 1, 2, 3, ...
 def generateFeatureStack(dictionary):
     stack = []
-    for id in dictionary:
+
+    for i in range(0,len(dictionary)):
+        id = str(i)
         print("Processing id=", id)
         features = []
 

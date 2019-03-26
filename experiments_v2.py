@@ -28,7 +28,7 @@ def stackFeatures(stackFile, sampleListFile):
     targetClasses = list()
     for i in range(sampleSize):
         # Extract the target class
-        target = data[i][1]
+        target = data[i][1].strip()
         targetClasses.append(target)
         # Extract the unique identifier for the symbol
         elements = str(data[i][0]).split("_")
@@ -53,6 +53,7 @@ def stackFeatures(stackFile, sampleListFile):
 
         # Merge this flattened image into our stack
         stack[i] =  stackCache[int(id)]
+        print("i=", i, ", id=", id)
     targetClasses = np.array(targetClasses, dtype=np.dtype('a16'))
     # print(targetClasses.shape)
     # print(stack.shape)
@@ -98,7 +99,7 @@ def main():
 
     # Don't use resampled dataset because this is simulating KNN-1; resampled data is not adding any value
     trainSymbols, trainTargetSymbols = stackFeatures("./symbolStack.csv", "./trainingSymbols/iso_GT_train.txt")
-    testSymbols, testTargetSymbols = stackFeatures("./junkStack.csv", "./trainingSymbols/iso_GT_test.txt")
+    testSymbols, testTargetSymbols = stackFeatures("./symbolStack.csv", "./trainingSymbols/iso_GT_test.txt")
 
     encoderModel = generateLabelsEncoder(trainTargetSymbols)
     # encoderModel = generateLabelsEncoder(testTargetSymbols)
