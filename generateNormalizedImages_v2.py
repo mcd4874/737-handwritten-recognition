@@ -271,13 +271,41 @@ def featureCountNormalization(stack, featureCount):
 
     return newStack
 
+def appendBinFeatures(stack, binCount):
+    newStack = []
+
+    for features in stack:
+        newFeatures = features.copy()
+
+        # Initialize bin features
+        binFeatures = []
+        for i in range(binCount):
+            binFeatures.append(0.0)
+
+        # Walk through each actual feature to populate the bins
+        for i in range(len(newFeatures)):
+            angle = newFeatures[i]
+            if angle < 0:
+                angle = angle + 360.0
+            sectorSize = 360.0 / binCount
+            chosenBin = int(math.floor(angle / sectorSize))
+            binFeatures[chosenBin] += 1.0
+
+        newFeatures.append(binFeatures)
+        print("bins: ", binFeatures)
+        print("New features with bins: ", newFeatures)
+        newStack.append(newFeatures)
+
+    return newStack
+
 def main():
     limit = 0
     w = 15
     h = 15
     thickness = 2
-    sector = 15.0
-    featureCount = 25
+    sector = 5
+    binCount = 8
+    featureCount = 30
 
     # Initialize the dictionary
     symbolsDictionary = dict()
@@ -303,11 +331,13 @@ def main():
     symbolStack = orientationNormalization(symbolStack, sector)
     symbolStack = deduplicationNormalization(symbolStack)
     symbolStack = featureCountNormalization(symbolStack, featureCount)
+    #symbolStack = appendBinFeatures(symbolStack, binCount)
 
     junkStack = generateFeatureStack(junkDictionary)
     junkStack = orientationNormalization(junkStack, sector)
     junkStack = deduplicationNormalization(junkStack)
     junkStack = featureCountNormalization(junkStack, featureCount)
+    #junkStack = appendBinFeatures(symbolStack, binCount)
 
     #print("stack=", stack)
 

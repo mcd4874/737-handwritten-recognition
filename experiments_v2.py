@@ -4,6 +4,7 @@ from sklearn.neighbors import KDTree
 from sklearn.metrics import confusion_matrix,classification_report
 from sklearn.preprocessing import LabelEncoder
 from sklearn.neighbors import KNeighborsClassifier
+from sklearn.ensemble import RandomForestClassifier
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -72,6 +73,11 @@ def trainKDTreeClassifier(stack,targetClasses):
 
     return kdTree
 
+def trainRandomForestClassifier(stack, targetClasses, maxTrees, maxDepth):
+    rf = RandomForestClassifier(n_estimators=maxTrees, max_depth=maxDepth)
+    rf.fit(stack,targetClasses)
+    return rf
+
 def testKDTreeClassifier(testSamplesFile, labelTestTarget, kdtree, encoderModel):
     predict = kdtree.predict(testSamplesFile)
     print("prediction: ",predict)
@@ -79,6 +85,14 @@ def testKDTreeClassifier(testSamplesFile, labelTestTarget, kdtree, encoderModel)
     #print(confusion_matrix(labelTestTarget, predict, labels=encoderModel.classes_))
     print(confusion_matrix(labelTestTarget, predict, labels=None))
     #print(classification_report(labelTestTarget, predict, target_names=encoderModel.classes_))
+    print(classification_report(labelTestTarget, predict, target_names=None))
+    return
+
+def testRandomForestClassifier(testSamplesFile, labelTestTarget, rf, encoderModel):
+    predict = rf.predict(testSamplesFile)
+    print("rf prediction: ", predict)
+    print("rf actual label: ", labelTestTarget)
+    print(confusion_matrix(labelTestTarget, predict, labels=None))
     print(classification_report(labelTestTarget, predict, target_names=None))
     return
 
@@ -94,12 +108,17 @@ def inverseTransformLabels(targetClasses,encoderModel):
     return encoderModel.inverse_transform(targetClasses)
 
 def main():
+    maxTrees = 300
+    maxDepth = 30
+
     #trainSymbols,targetSymbols = stackFeatures("./symbolStack.csv", "./trainingSymbols/iso_GT_train_resampled.txt")
     #testSymbols,testTargetSymbols = stackFeatures("./junkStack.csv", "./trainingSymbols/iso_GT_test_resampled.txt")
 
     # Don't use resampled dataset because this is simulating KNN-1; resampled data is not adding any value
     trainSymbols, trainTargetSymbols = stackFeatures("./symbolStack.csv", "./trainingSymbols/iso_GT_train.txt")
     testSymbols, testTargetSymbols = stackFeatures("./symbolStack.csv", "./trainingSymbols/iso_GT_test.txt")
+    #trainSymbols, trainTargetSymbols = stackFeatures("./symbolStack.csv", "./trainingSymbols/iso_GT_train_resampled.txt")
+    #testSymbols, testTargetSymbols = stackFeatures("./symbolStack.csv", "./trainingSymbols/iso_GT_test_resampled.txt")
 
     encoderModel = generateLabelsEncoder(trainTargetSymbols)
     # encoderModel = generateLabelsEncoder(testTargetSymbols)
@@ -110,9 +129,11 @@ def main():
     print("train target: ",labelTrainTarget)
     print("test target: ",labelTestTarget)
 
-    #kdtree = trainKDTreeClassifier(trainSymbols,labelTrainTarget)
-    kdtree = trainKDTreeClassifier(trainSymbols, trainTargetSymbols)
-    testKDTreeClassifier(testSymbols,testTargetSymbols, kdtree,encoderModel)
+    #kdtree = trainKDTreeClassifier(trainSymbols, trainTargetSymbols)
+    #testKDTreeClassifier(testSymbols,testTargetSymbols, kdtree,encoderModel)
+
+    rf = trainRandomForestClassifier(trainSymbols, trainTargetSymbols, maxTrees, maxDepth)
+    testRandomForestClassifier(testSymbols, testTargetSymbols, rf, encoderModel)
 
     return
 
