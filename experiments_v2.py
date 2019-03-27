@@ -108,8 +108,8 @@ def inverseTransformLabels(targetClasses,encoderModel):
     return encoderModel.inverse_transform(targetClasses)
 
 def main():
-    maxTrees = 300
-    maxDepth = 30
+    maxTrees = 100
+    maxDepth = 20
 
     #trainSymbols,targetSymbols = stackFeatures("./symbolStack.csv", "./trainingSymbols/iso_GT_train_resampled.txt")
     #testSymbols,testTargetSymbols = stackFeatures("./junkStack.csv", "./trainingSymbols/iso_GT_test_resampled.txt")

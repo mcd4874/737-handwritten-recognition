@@ -128,9 +128,11 @@ def generateNoConnectImages(dictionary, path, w, h):
     return
 
 
-def generateConnectedImages(dictionary, path, w, h, thickness):
+def generateConnectedImages(dictionary, imageDictionary, w, h, thickness):
     size = (h+1, w+1, 1)
-    for id in dictionary:
+
+    for i in range(0,len(dictionary)):
+        id = str(i)
         print("Connected: Processing image for ", id)
         img = np.full(size, 255, np.uint8)
 
@@ -159,8 +161,11 @@ def generateConnectedImages(dictionary, path, w, h, thickness):
             # Remember this as last coordinate
             lastCoordinate = strokeCoordinate
 
-        filename = "" + id + ".png"
-        cv2.imwrite(path + "/" + filename, img)
+        # Add the unraveled image to the image dictionary
+        imageDictionary[id] = img.ravel()
+
+        #filename = "" + id + ".png"
+        #cv2.imwrite(path + "/" + filename, img)
 
     return
 
@@ -192,6 +197,10 @@ def generateFeatureStack(dictionary):
 
             # Calculate the angle of the line connecting lastCoordinate[1] to lastCoordinate[2]
             angle = math.degrees(math.atan2(strokeCoordinate[2] - lastCoordinate[2], strokeCoordinate[1] - lastCoordinate[1]))
+
+            # Convert negative to positive angles
+            if angle < 0.0:
+                angle = angle + 360
             features.append(angle)
             #print("angle=", angle)
 
@@ -285,31 +294,57 @@ def appendBinFeatures(stack, binCount):
         # Walk through each actual feature to populate the bins
         for i in range(len(newFeatures)):
             angle = newFeatures[i]
-            if angle < 0:
-                angle = angle + 360.0
-            sectorSize = 360.0 / binCount
+            if angle == 0:
+                # Skip 0 angles, as these are most likely "filler" for sequences that arent long enough for featuresCount
+                # and therefore do not represent the underlying shape of the symbol.
+                continue
+            #if angle < 0:
+            #    angle = angle + 360.0
+            # Add small epsilon to force angle=360 into last bin instead of out-of-range
+            sectorSize = 360.0 / binCount  + 0.01
             chosenBin = int(math.floor(angle / sectorSize))
+            #print("chosenBin = ", chosenBin, ", i=", i, ", newFeatures=", newFeatures)
             binFeatures[chosenBin] += 1.0
 
-        newFeatures.append(binFeatures)
+        newFeatures.extend(binFeatures)
         print("bins: ", binFeatures)
         print("New features with bins: ", newFeatures)
         newStack.append(newFeatures)
 
     return newStack
 
+def appendImageFeatures(stack, imageDictionary):
+    newStack = []
+
+    for i in range(len(stack)):
+        id = str(i)
+        features = stack[i]
+        newFeatures = features.copy()
+
+        # Obtain the raveled image
+        imageFeatures = imageDictionary[id]
+
+        newFeatures.extend(imageFeatures)
+        #print("imageFeatures: ", imageFeatures)
+        #print("New features with imageFeatures: ", newFeatures)
+        newStack.append(newFeatures)
+
+    return newStack
+
 def main():
     limit = 0
-    w = 15
-    h = 15
+    w = 20
+    h = 20
     thickness = 2
-    sector = 5
-    binCount = 8
+    sector = 15
+    binCount = 4
     featureCount = 30
 
     # Initialize the dictionary
     symbolsDictionary = dict()
     junkDictionary = dict()
+    symbolsImageDictionary = dict()
+    junkImageDictionary = dict()
 
     # Load Symbols and Junk samples into the common dictionary, indexed by UI "unique identifier?"
     loadSamplesIntoDictionary(symbolsDictionary, "./trainingSymbols/", limit)
@@ -324,20 +359,22 @@ def main():
     #generateNoConnectImages(junkDictionary, "./images/no_connect/junk/", w, h)
 
     # Create "connected" images
-    #generateConnectedImages(symbolsDictionary, "./images/connect/symbols/", w, h, thickness)
-    #generateConnectedImages(junkDictionary, "./images/connect/junk/
+    generateConnectedImages(symbolsDictionary, symbolsImageDictionary, w, h, thickness)
+    generateConnectedImages(junkDictionary, junkImageDictionary, w, h, thickness)
 
     symbolStack = generateFeatureStack(symbolsDictionary)
     symbolStack = orientationNormalization(symbolStack, sector)
     symbolStack = deduplicationNormalization(symbolStack)
     symbolStack = featureCountNormalization(symbolStack, featureCount)
-    #symbolStack = appendBinFeatures(symbolStack, binCount)
+    symbolStack = appendBinFeatures(symbolStack, binCount)
+    symbolStack = appendImageFeatures(symbolStack, symbolsImageDictionary)
 
     junkStack = generateFeatureStack(junkDictionary)
     junkStack = orientationNormalization(junkStack, sector)
     junkStack = deduplicationNormalization(junkStack)
     junkStack = featureCountNormalization(junkStack, featureCount)
-    #junkStack = appendBinFeatures(symbolStack, binCount)
+    junkStack = appendBinFeatures(junkStack, binCount)
+    junkStack = appendImageFeatures(junkStack, junkImageDictionary)
 
     #print("stack=", stack)
 
