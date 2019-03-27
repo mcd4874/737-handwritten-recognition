@@ -318,6 +318,7 @@ def appendImageFeatures(stack, imageDictionary):
 
     for i in range(len(stack)):
         id = str(i)
+        print("Appending image features for id=", id)
         features = stack[i]
         newFeatures = features.copy()
 
@@ -335,9 +336,9 @@ def main():
     limit = 0
     w = 20
     h = 20
-    thickness = 2
-    sector = 15
-    binCount = 4
+    thickness = 4
+    sector = 45
+    binCount = 8
     featureCount = 30
 
     # Initialize the dictionary
