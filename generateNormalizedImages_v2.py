@@ -355,12 +355,12 @@ def main():
     normalizeSamples(junkDictionary, w, h)
 
     # Create "no-connect" images
-    #generateNoConnectImages(symbolsDictionary, "./images/no_connect/symbols/", w, h)
-    #generateNoConnectImages(junkDictionary, "./images/no_connect/junk/", w, h)
+    generateNoConnectImages(symbolsDictionary, "./images/no_connect/symbols/", w, h)
+    generateNoConnectImages(junkDictionary, "./images/no_connect/junk/", w, h)
 
     # Create "connected" images
-    generateConnectedImages(symbolsDictionary, symbolsImageDictionary, w, h, thickness)
-    generateConnectedImages(junkDictionary, junkImageDictionary, w, h, thickness)
+    # generateConnectedImages(symbolsDictionary, symbolsImageDictionary, w, h, thickness)
+    # generateConnectedImages(junkDictionary, junkImageDictionary, w, h, thickness)
 
     symbolStack = generateFeatureStack(symbolsDictionary)
     symbolStack = orientationNormalization(symbolStack, sector)

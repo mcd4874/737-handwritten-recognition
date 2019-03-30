@@ -4,6 +4,7 @@ from sklearn.neighbors import KDTree
 from sklearn.metrics import confusion_matrix,classification_report
 from sklearn.preprocessing import LabelEncoder
 from sklearn.neighbors import KNeighborsClassifier
+from sklearn.ensemble import RandomForestClassifier
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -19,6 +20,7 @@ def stackImages(imagesPath, sampleListFile):
 
     # Iterate over the lines in the sampleList file
     sampleSize = len(data)
+    print(sampleSize)
     # sampleSize = 100
     # for i in range(len(data)):
     targetClasses = list()
@@ -67,12 +69,26 @@ def trainKDTreeClassifier(stack,targetClasses):
 
     return kdTree
 
-def testKDTreeClassifier(testSamplesFile, testTargetSample, kdtree, encoderModel):
+def trainRandomForestClassifier(stack, targetClasses, maxTrees, maxDepth):
+    rf = RandomForestClassifier(n_estimators=maxTrees, max_depth=maxDepth)
+    rf.fit(stack,targetClasses)
+    return rf
+
+def testKDTreeClassifier(testSamplesFile, labelTestTarget, kdtree, encoderModel):
     predict = kdtree.predict(testSamplesFile)
     print("prediction: ",predict)
-    print("actual label : ",testSamplesFile)
-    print(confusion_matrix(testSamplesFile, predict, labels=encoderModel.classes_))
-    print(classification_report(testSamplesFile, predict, target_names=encoderModel.classes_))
+    print("actual label : ",labelTestTarget)
+    # print('confusion matrix',confusion_matrix(labelTestTarget, predict, classes=encoderModel.classes_, label_encoder=encoder))
+    print(confusion_matrix(labelTestTarget, predict))
+    #print(classification_report(labelTestTarget, predict, target_names=encoderModel.classes_))
+    print(classification_report(labelTestTarget, predict, target_names=encoderModel.classes_))
+    return
+def testRandomForestClassifier(testSamplesFile, labelTestTarget, rf, encoderModel):
+    predict = rf.predict(testSamplesFile)
+    print("rf prediction: ", predict)
+    print("rf actual label: ", labelTestTarget)
+    print(confusion_matrix(labelTestTarget, predict, labels=None))
+    print(classification_report(labelTestTarget, predict, target_names=encoderModel.classes_))
     return
 
 def generateLabelsEncoder(targetClasses):
@@ -87,20 +103,30 @@ def inverseTransformLabels(targetClasses,encoderModel):
     return encoderModel.inverse_transform(targetClasses)
 
 def main():
-    trainSymbols,targetSymbols = stackImages("./images/connect/symbols/", "./trainingSymbols/iso_GT_train_resampled.txt")
-    testSymbols,testTargetSymbols = stackImages("./images/connect/junk/", "./trainingSymbols/iso_GT_test_resampled.txt")
+    trainSymbols,targetSymbols = stackImages("./images/connect/symbols/", "./trainingSymbols/iso_GT_train.txt")
+    testSymbols,testTargetSymbols = stackImages("./images/connect/symbols/", "./trainingSymbols/iso_GT_test.txt")
 
     encoderModel = generateLabelsEncoder(targetSymbols)
     # encoderModel = generateLabelsEncoder(testTargetSymbols)
 
+    # trainSymbols = trainSymbols[:1000]
+    # targetSymbols = targetSymbols[:1000]
+    # testSymbols = testSymbols[:100]
+    # testTargetSymbols = testTargetSymbols[:100]
     print(encoderModel.classes_)
+    # print(encoderModel.classes_[])
     labelTrainTarget = transformLabels(targetSymbols,encoderModel)
     labelTestTarget = transformLabels(testTargetSymbols,encoderModel)
-    print("train target: ",labelTrainTarget)
-    print("test target: ",labelTestTarget)
-    #
+    # print("train target: ",labelTrainTarget)
+    # print("test target: ",labelTestTarget)
+    # # #
     kdtree = trainKDTreeClassifier(trainSymbols,labelTrainTarget)
     testKDTreeClassifier(testSymbols,labelTestTarget, kdtree,encoderModel)
+    maxTrees = 100
+    maxDepth = 20
+    print("random forest ::")
+    rf = trainRandomForestClassifier(trainSymbols, targetSymbols, maxTrees, maxDepth)
+    testRandomForestClassifier(testSymbols, testTargetSymbols, rf, encoderModel)
 
     return
 
