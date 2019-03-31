@@ -95,7 +95,7 @@ def generateBalancedClasses(sourceFile, outputFile):
 def main():
     # Training/Test split by each symbol class
     generateTrainTestSplit("./trainingSymbols/iso_GT.txt", "./trainingSymbols/iso_GT_train.txt", "./trainingSymbols/iso_GT_test.txt")
-    generateTrainTestSplit("./trainingJunk/junk_GT.txt", "./trainingJunk/junk_GT_train.txt",
+    generateTrainTestSplit("./trainingJunk/junk_GT_v2.txt", "./trainingJunk/junk_GT_train.txt",
                            "./trainingJunk/junk_GT_test.txt")
 
     # Resample the real training symbols for train/test splits
