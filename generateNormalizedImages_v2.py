@@ -111,7 +111,7 @@ def loadSamplesIntoDictionary(dictionary, directoryPath, limit):
 
     return
 
-def generateNoConnectImages(dictionary, path, w, h):
+def generateNoConnectImagesOLD(dictionary, path, w, h):
     size = (h+1, w+1, 1)
     for id in dictionary:
         print("NoConnect: Processing image for ", id)
@@ -127,6 +127,21 @@ def generateNoConnectImages(dictionary, path, w, h):
 
     return
 
+def generateNoConnectImages(dictionary, imageDictionary, w, h):
+    size = (h+1, w+1, 1)
+    for id in dictionary:
+        print("NoConnect: Processing image for ", id)
+        img = np.full(size, 255, np.uint8)
+
+        # Process each point
+        for strokeCoordinate in dictionary[id]:
+            # Stroke, X, Y into img[Y][X]
+            #print("strokeCoordinate=", strokeCoordinate)
+            img[math.floor(strokeCoordinate[2])][math.floor(strokeCoordinate[1])] = 0
+
+        # Add the unraveled image to the image dictionary
+        imageDictionary[id] = img.ravel()
+    return
 
 def generateConnectedImages(dictionary, imageDictionary, w, h, thickness):
     size = (h+1, w+1, 1)
@@ -318,6 +333,7 @@ def appendImageFeatures(stack, imageDictionary):
 
     for i in range(len(stack)):
         id = str(i)
+        print("Appending image features for id=", id)
         features = stack[i]
         newFeatures = features.copy()
 
@@ -335,9 +351,9 @@ def main():
     limit = 0
     w = 20
     h = 20
-    thickness = 2
-    sector = 15
-    binCount = 4
+    thickness = 4
+    sector = 45
+    binCount = 8
     featureCount = 30
 
     # Initialize the dictionary
@@ -355,12 +371,15 @@ def main():
     normalizeSamples(junkDictionary, w, h)
 
     # Create "no-connect" images
-    generateNoConnectImages(symbolsDictionary, "./images/no_connect/symbols/", w, h)
-    generateNoConnectImages(junkDictionary, "./images/no_connect/junk/", w, h)
+
+    #generateNoConnectImages(symbolsDictionary, "./images/no_connect/symbols/", w, h)
+    #generateNoConnectImages(junkDictionary, "./images/no_connect/junk/", w, h)
+    generateNoConnectImages(symbolsDictionary, symbolsImageDictionary, w, h);
+    generateNoConnectImages(junkDictionary, junkImageDictionary, w, h);
 
     # Create "connected" images
-    # generateConnectedImages(symbolsDictionary, symbolsImageDictionary, w, h, thickness)
-    # generateConnectedImages(junkDictionary, junkImageDictionary, w, h, thickness)
+    #generateConnectedImages(symbolsDictionary, symbolsImageDictionary, w, h, thickness)
+    #generateConnectedImages(junkDictionary, junkImageDictionary, w, h, thickness)
 
     symbolStack = generateFeatureStack(symbolsDictionary)
     symbolStack = orientationNormalization(symbolStack, sector)

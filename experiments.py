@@ -5,7 +5,7 @@ from sklearn.metrics import confusion_matrix,classification_report
 from sklearn.preprocessing import LabelEncoder
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.ensemble import RandomForestClassifier
-
+import pickle
 import numpy as np
 import matplotlib.pyplot as plt
 import math
@@ -74,8 +74,31 @@ def trainRandomForestClassifier(stack, targetClasses, maxTrees, maxDepth):
     rf.fit(stack,targetClasses)
     return rf
 
+def get_list_indices_predict(testSamplesFile, labelTestTarget, kdtree, encoderModel):
+    # predict = kdtree.predict(testSamplesFile)
+    predict_probs = kdtree.predict_proba(testSamplesFile)
+    # print("sahpe of probs : ", predict_probs.shape)
+    sort_predict_probs_indices = predict_probs.argsort(axis = 1)[:,-10:]
+    # print(sort_predict_probs_indices)
+    # print("sort probs shape:",sort_predict_probs_indices.shape)
+    result = np.chararray(sort_predict_probs_indices.shape, itemsize=20)
+    # predict_label = np.chararray(predict.shape, itemsize=20)
+    for i in range(result.shape[0]):
+        # predict_label[i] = encoderModel.classes_[predict[i]]
+        for j in range(result.shape[1]):
+            result[i][j] = encoderModel.classes_[sort_predict_probs_indices[i][j]]
+        result[i] = result[i][::-1]
+    # print(result[980:1000])
+    # print(predict_label[980:1000])
+    # result.append(encoderModel.classes_[sort_predict_probs_indices[i]])
+    return result
+
+
 def testKDTreeClassifier(testSamplesFile, labelTestTarget, kdtree, encoderModel):
     predict = kdtree.predict(testSamplesFile)
+
+
+
     print("prediction: ",predict)
     print("actual label : ",labelTestTarget)
     # print('confusion matrix',confusion_matrix(labelTestTarget, predict, classes=encoderModel.classes_, label_encoder=encoder))
@@ -102,31 +125,48 @@ def transformLabels(targetClasses,encoderModel):
 def inverseTransformLabels(targetClasses,encoderModel):
     return encoderModel.inverse_transform(targetClasses)
 
+def saveModel(pkl_filename,model):
+    with open(pkl_filename, 'wb') as file:
+        pickle.dump(model, file)
+def loadModel(pkl_filename):
+    with open(pkl_filename, 'rb') as file:
+        pickle_model = pickle.load(file)
+        print("finish load model from ",pkl_filename)
+        return pickle_model
+
+
+
 def main():
-    trainSymbols,targetSymbols = stackImages("./images/connect/symbols/", "./trainingSymbols/iso_GT_train.txt")
+    # trainSymbols,targetSymbols = stackImages("./images/connect/symbols/", "./trainingSymbols/iso_GT_train.txt")
     testSymbols,testTargetSymbols = stackImages("./images/connect/symbols/", "./trainingSymbols/iso_GT_test.txt")
 
-    encoderModel = generateLabelsEncoder(targetSymbols)
-    # encoderModel = generateLabelsEncoder(testTargetSymbols)
+    # encoderModel = generateLabelsEncoder(targetSymbols)
+    # saveModel("encoder.pkl",encoderModel)
 
-    # trainSymbols = trainSymbols[:1000]
-    # targetSymbols = targetSymbols[:1000]
-    # testSymbols = testSymbols[:100]
-    # testTargetSymbols = testTargetSymbols[:100]
-    print(encoderModel.classes_)
-    # print(encoderModel.classes_[])
-    labelTrainTarget = transformLabels(targetSymbols,encoderModel)
+    encoderModel = loadModel("encoder.pkl")
+
+    # trainSymbols = trainSymbols[:20000]
+    # targetSymbols = targetSymbols[:20000]
+    testSymbols = testSymbols[:1000]
+    testTargetSymbols = testTargetSymbols[:1000]
+    # labelTrainTarget = transformLabels(targetSymbols,encoderModel)
     labelTestTarget = transformLabels(testTargetSymbols,encoderModel)
-    # print("train target: ",labelTrainTarget)
-    # print("test target: ",labelTestTarget)
-    # # #
-    kdtree = trainKDTreeClassifier(trainSymbols,labelTrainTarget)
-    testKDTreeClassifier(testSymbols,labelTestTarget, kdtree,encoderModel)
-    maxTrees = 100
-    maxDepth = 20
-    print("random forest ::")
-    rf = trainRandomForestClassifier(trainSymbols, targetSymbols, maxTrees, maxDepth)
-    testRandomForestClassifier(testSymbols, testTargetSymbols, rf, encoderModel)
+
+    # kdtree = trainKDTreeClassifier(trainSymbols,labelTrainTarget)
+    # saveModel("result.pkl",kdtree)
+    kdtree = loadModel("result.pkl")
+    list_test_best_label_predict = get_list_indices_predict(testSymbols,labelTestTarget, kdtree,encoderModel)
+
+
+
+
+
+    # testKDTreeClassifier(testSymbols,labelTestTarget, kdtree,encoderModel)
+    # maxTrees = 100
+    # maxDepth = 20
+    # print("random forest ::")
+    # rf = trainRandomForestClassifier(trainSymbols, targetSymbols, maxTrees, maxDepth)
+    # testRandomForestClassifier(testSymbols, testTargetSymbols, rf, encoderModel)
 
     return
 
