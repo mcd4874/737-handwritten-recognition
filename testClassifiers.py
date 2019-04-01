@@ -13,6 +13,7 @@ import xml.etree.ElementTree as ET
 import os
 import cv2
 import pickle
+import pandas as pd
 
 def stackFeatures(stackFile, sampleListFile):
     # Load the dictionary file
@@ -86,14 +87,22 @@ def trainRandomForestClassifier(stack, targetClasses, maxTrees, maxDepth):
     rf.fit(stack[:, 1:],targetClasses)
     return rf
 
-def testKDTreeClassifier(testSamplesFile, labelTestTarget, kdtree, encoderModel):
+def testKDTreeClassifier(testSamplesFile, labelTestTarget, kdtree, encoderModel, uiStack):
     predict = kdtree.predict(testSamplesFile[:, 1:])
+    #dist, ind = kdtree.query(testSamplesFile[:, 1:])
+    #print("ind = ", ind)
+
     print("prediction: ",predict)
     print("actual label : ",labelTestTarget)
-    #print(confusion_matrix(labelTestTarget, predict, labels=encoderModel.classes_))
     print(confusion_matrix(labelTestTarget, predict, labels=None))
-    #print(classification_report(labelTestTarget, predict, target_names=encoderModel.classes_))
     print(classification_report(labelTestTarget, predict, target_names=None))
+
+    print("Creating prediction output file");
+    for i in range(len(testSamplesFile)):
+        # Predict individual row, skipping UI row header
+
+        # Output the prediction results
+        print(uiStack[i], ", ", cleanString(predict[i]), ", actual=", cleanString(labelTestTarget[i]))
     return
 
 def cleanString(string):
@@ -126,6 +135,32 @@ def transformLabels(targetClasses,encoderModel):
 def inverseTransformLabels(targetClasses,encoderModel):
     return encoderModel.inverse_transform(targetClasses)
 
+def get_list_indices_predict(testSamplesFile, labelTestTarget, classifier, encoderModel):
+    resultList = []
+
+    # predict = kdtree.predict(testSamplesFile)
+    predict_probs = classifier.predict_proba(testSamplesFile[:, 1:])
+    # print("sahpe of probs : ", predict_probs.shape)
+    sort_predict_probs_indices = predict_probs.argsort(axis = 1)[:,-10:]
+    # print(sort_predict_probs_indices)
+    # print("sort probs shape:",sort_predict_probs_indices.shape)
+    result = np.chararray(sort_predict_probs_indices.shape, itemsize=20)
+    # predict_label = np.chararray(predict.shape, itemsize=20)
+    for i in range(result.shape[0]):
+        resultVector = []
+        # predict_label[i] = encoderModel.classes_[predict[i]]
+        for j in range(result.shape[1]):
+            result[i][j] = encoderModel.classes_[sort_predict_probs_indices[i][j]]
+            resultVector.append(cleanString(result[i][j]))
+        result[i] = result[i][::-1]
+        resultList.append(resultVector)
+    # print(result[980:1000])
+    # print(predict_label[980:1000])
+    # result.append(encoderModel.classes_[sort_predict_probs_indices[i]])
+
+    #return result
+    return resultList
+
 def main():
     testSymbols, testTargetSymbols, uiStack = stackFeatures("./symbolStack.csv", "./trainingSymbols/iso_GT_test.txt")
 
@@ -136,8 +171,14 @@ def main():
     labelTestTarget = transformLabels(testTargetSymbols,encoderModel)
     print("test target: ",labelTestTarget)
 
-    #kdtree = trainKDTreeClassifier(trainSymbols, trainTargetSymbols)
-    #testKDTreeClassifier(testSymbols,testTargetSymbols, kdtree,encoderModel)
+    # Load the kdtree from our pickle
+    print("Loading kdtree from pickle...")
+    pkl_filename = "pickle_kdtree.pkl"
+    with open(pkl_filename, 'rb') as file:
+        kdtree = pickle.load(file)
+    print("Finished loading.")
+
+    #testKDTreeClassifier(testSymbols, testTargetSymbols, kdtree, encoderModel, uiStack)
 
     # Load the RandomForestClassifier from our pickle
     # https://stackabuse.com/scikit-learn-save-and-restore-models/
@@ -145,8 +186,16 @@ def main():
     pkl_filename = "pickle_rf.pkl"
     with open(pkl_filename, 'rb') as file:
         rf = pickle.load(file)
-    print("Finished loading.");
+    print("Finished loading.")
 
     testRandomForestClassifier(testSymbols, testTargetSymbols, rf, encoderModel, uiStack)
+
+    list_test_best_label_predict = get_list_indices_predict(testSymbols,labelTestTarget, rf, encoderModel)
+    # print(list_test_best_label_predict.shape)
+    #
+    df1 = pd.DataFrame(uiStack)
+    df2 = pd.DataFrame(list_test_best_label_predict)
+    r = pd.concat([df1,df2],axis=1)
+    r.to_csv("report_table.csv",index = False,header = False)
     return
 main()
