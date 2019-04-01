@@ -101,7 +101,7 @@ def cleanString(string):
     return elements[1];
 
 def testRandomForestClassifier(testSamplesFile, labelTestTarget, rf, encoderModel, uiStack):
-    predict = rf.predict_proba(testSamplesFile[:, 1:])
+    predict = rf.predict(testSamplesFile[:, 1:])
     print("rf prediction: ", predict)
     print("rf actual label: ", labelTestTarget)
     print(confusion_matrix(labelTestTarget, predict, labels=None))
