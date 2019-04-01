@@ -14,6 +14,7 @@ import os
 import cv2
 import pickle
 import pandas as pd
+import csv
 
 def stackFeatures(stackFile, sampleListFile):
     # Load the dictionary file
@@ -36,7 +37,7 @@ def stackFeatures(stackFile, sampleListFile):
         targetClasses.append(target)
         # Extract the unique identifier for the symbol
         ui = data[i][0];
-        uiStack.append(ui)
+        uiStack.append(ui.strip())
         elements = str(data[i][0]).split("_")
         id = elements[len(elements) - 1]
         #filename = imagesPath + id + ".png"
@@ -65,28 +66,6 @@ def stackFeatures(stackFile, sampleListFile):
     # print(stack.shape)
     return stack, targetClasses, uiStack
 
-def trainKDTreeClassifier(stack,targetClasses):
-    # print("About to run KDTree")
-    # kdtree = KDTree(stack)
-    # print("About to query KDTree")
-    # dist, ind = kdtree.query(stack[1], k=3)
-    # print("indices of 3 closest = ", ind)
-    # print("distances of 3 closest = ", dist)
-
-    kdTree = KNeighborsClassifier(n_neighbors=1, algorithm='kd_tree')
-
-    # Train with the data skipping the 0th column containing the UI
-    kdTree.fit(stack[:, 1:],targetClasses)
-
-    return kdTree
-
-def trainRandomForestClassifier(stack, targetClasses, maxTrees, maxDepth):
-    rf = RandomForestClassifier(n_estimators=maxTrees, max_depth=maxDepth)
-
-    # Train with the data skipping the 0th column containing the UI
-    rf.fit(stack[:, 1:],targetClasses)
-    return rf
-
 def testKDTreeClassifier(testSamplesFile, labelTestTarget, kdtree, encoderModel, uiStack):
     predict = kdtree.predict(testSamplesFile[:, 1:])
     #dist, ind = kdtree.query(testSamplesFile[:, 1:])
@@ -96,13 +75,6 @@ def testKDTreeClassifier(testSamplesFile, labelTestTarget, kdtree, encoderModel,
     print("actual label : ",labelTestTarget)
     print(confusion_matrix(labelTestTarget, predict, labels=None))
     print(classification_report(labelTestTarget, predict, target_names=None))
-
-    print("Creating prediction output file");
-    for i in range(len(testSamplesFile)):
-        # Predict individual row, skipping UI row header
-
-        # Output the prediction results
-        print(uiStack[i], ", ", cleanString(predict[i]), ", actual=", cleanString(labelTestTarget[i]))
     return
 
 def cleanString(string):
@@ -113,15 +85,23 @@ def testRandomForestClassifier(testSamplesFile, labelTestTarget, rf, encoderMode
     predict = rf.predict(testSamplesFile[:, 1:])
     print("rf prediction: ", predict)
     print("rf actual label: ", labelTestTarget)
+    print("Manual confusion matrix:")
+
+    matrix = confusion_matrix(labelTestTarget, predict, labels=None)
+
+    # Print Column Headers for confusion matrix
+    print ("", end=",")  # Initial spacer for header row
+    for i in range(len(matrix[0])):
+        print (encoderModel.classes_[i], end=",")
+    print("")
+    for i in range(len(matrix)):
+        # Prubt Row Headers for confusion matrix
+        print (encoderModel.classes_[i], end=",")
+        for j in range(len(matrix[i])):
+            print (matrix[i][j], end=",")
+        print("")
     print(confusion_matrix(labelTestTarget, predict, labels=None))
     print(classification_report(labelTestTarget, predict, target_names=None))
-
-    print("Creating prediction output file");
-    for i in range(len(testSamplesFile)):
-        # Predict individual row, skipping UI row header
-
-        # Output the prediction results
-        print(uiStack[i], ", ", cleanString(predict[i]), ", actual=", cleanString(labelTestTarget[i]))
     return
 
 def generateLabelsEncoder(targetClasses):
@@ -179,6 +159,11 @@ def main():
     print("Finished loading.")
 
     #testKDTreeClassifier(testSymbols, testTargetSymbols, kdtree, encoderModel, uiStack)
+    #list_test_best_label_predict = get_list_indices_predict(testSymbols,labelTestTarget, rf, encoderModel)
+    #df1 = pd.DataFrame(uiStack)
+    #df2 = pd.DataFrame(list_test_best_label_predict)
+    #r = pd.concat([df1,df2],axis=1)
+    #r.to_csv("report_table_kdtree.csv",index = False,header = False, encoding="utf-8", quoting=csv.QUOTE_NONE)
 
     # Load the RandomForestClassifier from our pickle
     # https://stackabuse.com/scikit-learn-save-and-restore-models/
@@ -189,13 +174,10 @@ def main():
     print("Finished loading.")
 
     testRandomForestClassifier(testSymbols, testTargetSymbols, rf, encoderModel, uiStack)
-
     list_test_best_label_predict = get_list_indices_predict(testSymbols,labelTestTarget, rf, encoderModel)
-    # print(list_test_best_label_predict.shape)
-    #
     df1 = pd.DataFrame(uiStack)
     df2 = pd.DataFrame(list_test_best_label_predict)
     r = pd.concat([df1,df2],axis=1)
-    r.to_csv("report_table.csv",index = False,header = False)
+    r.to_csv("report_table_rf.csv",index = False,header = False, encoding="utf-8", quoting=csv.QUOTE_NONE)
     return
 main()
