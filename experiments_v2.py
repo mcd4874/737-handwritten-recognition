@@ -80,12 +80,14 @@ def trainRandomForestClassifier(stack, targetClasses, maxTrees, maxDepth):
 
 def testKDTreeClassifier(testSamplesFile, labelTestTarget, kdtree, encoderModel):
     predict = kdtree.predict(testSamplesFile)
+    predict_probs = kdtree.predict_probs(testSamplesFile)
+    print(predict_probs)
     print("prediction: ",predict)
     print("actual label : ",labelTestTarget)
     #print(confusion_matrix(labelTestTarget, predict, labels=encoderModel.classes_))
     print(confusion_matrix(labelTestTarget, predict, labels=None))
     #print(classification_report(labelTestTarget, predict, target_names=encoderModel.classes_))
-    print(classification_report(labelTestTarget, predict, target_names=None))
+    print(classification_report(labelTestTarget, predict, target_names=encoderModel.classes_))
     return
 
 def testRandomForestClassifier(testSamplesFile, labelTestTarget, rf, encoderModel):
@@ -93,7 +95,7 @@ def testRandomForestClassifier(testSamplesFile, labelTestTarget, rf, encoderMode
     print("rf prediction: ", predict)
     print("rf actual label: ", labelTestTarget)
     print(confusion_matrix(labelTestTarget, predict, labels=None))
-    print(classification_report(labelTestTarget, predict, target_names=None))
+    print(classification_report(labelTestTarget, predict, target_names=encoderModel.classes_))
     return
 
 def generateLabelsEncoder(targetClasses):
@@ -123,14 +125,16 @@ def main():
     encoderModel = generateLabelsEncoder(trainTargetSymbols)
     # encoderModel = generateLabelsEncoder(testTargetSymbols)
 
+
+
     print(encoderModel.classes_)
     labelTrainTarget = transformLabels(trainTargetSymbols,encoderModel)
     labelTestTarget = transformLabels(testTargetSymbols,encoderModel)
-    print("train target: ",labelTrainTarget)
-    print("test target: ",labelTestTarget)
+    # print("train target: ",labelTrainTarget)
+    # print("test target: ",labelTestTarget)
 
-    #kdtree = trainKDTreeClassifier(trainSymbols, trainTargetSymbols)
-    #testKDTreeClassifier(testSymbols,testTargetSymbols, kdtree,encoderModel)
+    # kdtree = trainKDTreeClassifier(trainSymbols, trainTargetSymbols)
+    # testKDTreeClassifier(testSymbols,testTargetSymbols, kdtree,encoderModel)
 
     rf = trainRandomForestClassifier(trainSymbols, trainTargetSymbols, maxTrees, maxDepth)
     testRandomForestClassifier(testSymbols, testTargetSymbols, rf, encoderModel)
