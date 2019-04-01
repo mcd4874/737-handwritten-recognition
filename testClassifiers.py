@@ -22,6 +22,7 @@ def stackFeatures(stackFile, sampleListFile):
     stackCache = np.genfromtxt(stackFile, delimiter=',', dtype=float)
 
     stack = None
+    uiStack = []
 
     # Iterate over the lines in the sampleList file
     sampleSize = len(data)
@@ -33,6 +34,8 @@ def stackFeatures(stackFile, sampleListFile):
         target = data[i][1].strip()
         targetClasses.append(target)
         # Extract the unique identifier for the symbol
+        ui = data[i][0];
+        uiStack.append(ui)
         elements = str(data[i][0]).split("_")
         id = elements[len(elements) - 1]
         #filename = imagesPath + id + ".png"
@@ -59,7 +62,7 @@ def stackFeatures(stackFile, sampleListFile):
     targetClasses = np.array(targetClasses, dtype=np.dtype('a16'))
     # print(targetClasses.shape)
     # print(stack.shape)
-    return stack,targetClasses
+    return stack, targetClasses, uiStack
 
 def trainKDTreeClassifier(stack,targetClasses):
     # print("About to run KDTree")
@@ -93,14 +96,23 @@ def testKDTreeClassifier(testSamplesFile, labelTestTarget, kdtree, encoderModel)
     print(classification_report(labelTestTarget, predict, target_names=None))
     return
 
-def testRandomForestClassifier(testSamplesFile, labelTestTarget, rf, encoderModel):
-    predict = rf.predict(testSamplesFile[:, 1:])
+def cleanString(string):
+    elements = str(string).split("'")
+    return elements[1];
+
+def testRandomForestClassifier(testSamplesFile, labelTestTarget, rf, encoderModel, uiStack):
+    predict = rf.predict_proba(testSamplesFile[:, 1:])
     print("rf prediction: ", predict)
     print("rf actual label: ", labelTestTarget)
     print(confusion_matrix(labelTestTarget, predict, labels=None))
     print(classification_report(labelTestTarget, predict, target_names=None))
 
+    print("Creating prediction output file");
+    for i in range(len(testSamplesFile)):
+        # Predict individual row, skipping UI row header
 
+        # Output the prediction results
+        print(uiStack[i], ", ", cleanString(predict[i]), ", actual=", cleanString(labelTestTarget[i]))
     return
 
 def generateLabelsEncoder(targetClasses):
@@ -115,39 +127,26 @@ def inverseTransformLabels(targetClasses,encoderModel):
     return encoderModel.inverse_transform(targetClasses)
 
 def main():
-    maxTrees = 100
-    maxDepth = 20
+    testSymbols, testTargetSymbols, uiStack = stackFeatures("./symbolStack.csv", "./trainingSymbols/iso_GT_test.txt")
 
-    #trainSymbols,targetSymbols = stackFeatures("./symbolStack.csv", "./trainingSymbols/iso_GT_train_resampled.txt")
-    #testSymbols,testTargetSymbols = stackFeatures("./junkStack.csv", "./trainingSymbols/iso_GT_test_resampled.txt")
-
-    # Don't use resampled dataset because this is simulating KNN-1; resampled data is not adding any value
-    trainSymbols, trainTargetSymbols = stackFeatures("./symbolStack.csv", "./trainingSymbols/iso_GT_train.txt")
-    testSymbols, testTargetSymbols = stackFeatures("./symbolStack.csv", "./trainingSymbols/iso_GT_test.txt")
-    #trainSymbols, trainTargetSymbols = stackFeatures("./symbolStack.csv", "./trainingSymbols/iso_GT_train_resampled.txt")
-    #testSymbols, testTargetSymbols = stackFeatures("./symbolStack.csv", "./trainingSymbols/iso_GT_test_resampled.txt")
-
-    encoderModel = generateLabelsEncoder(trainTargetSymbols)
+    encoderModel = generateLabelsEncoder(testTargetSymbols)
     # encoderModel = generateLabelsEncoder(testTargetSymbols)
 
     print(encoderModel.classes_)
-    labelTrainTarget = transformLabels(trainTargetSymbols,encoderModel)
     labelTestTarget = transformLabels(testTargetSymbols,encoderModel)
-    print("train target: ",labelTrainTarget)
     print("test target: ",labelTestTarget)
 
     #kdtree = trainKDTreeClassifier(trainSymbols, trainTargetSymbols)
     #testKDTreeClassifier(testSymbols,testTargetSymbols, kdtree,encoderModel)
 
-    rf = trainRandomForestClassifier(trainSymbols, trainTargetSymbols, maxTrees, maxDepth)
-
-    # Save the RandomForestClassifier for later use
+    # Load the RandomForestClassifier from our pickle
     # https://stackabuse.com/scikit-learn-save-and-restore-models/
+    print("Loading random forest from pickle...")
     pkl_filename = "pickle_rf.pkl"
-    with open(pkl_filename, 'wb') as file:
-        pickle.dump(rf, file)
+    with open(pkl_filename, 'rb') as file:
+        rf = pickle.load(file)
+    print("Finished loading.");
 
-    #testRandomForestClassifier(testSymbols, testTargetSymbols, rf, encoderModel)
+    testRandomForestClassifier(testSymbols, testTargetSymbols, rf, encoderModel, uiStack)
     return
-
 main()
