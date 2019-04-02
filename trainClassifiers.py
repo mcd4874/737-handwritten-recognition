@@ -33,12 +33,8 @@ def stackFeatures(stackFile, sampleListFile):
 
     # Load the stackFile
     stackCache = np.genfromtxt(stackFile, delimiter=',', dtype=float)
-    #stackCacheString = np.genfromtxt(stackFile, delimiter=',', dtype=str)
 
     # Create a dictionary from UI to stackCache index
-    #uiToIndex = dict()
-    #for i in range(len(stackCache)):
-    #    uiToIndex[stackCacheString[i][0]] = i
 
     stack = None
 
@@ -50,7 +46,6 @@ def stackFeatures(stackFile, sampleListFile):
         target = data[i][1].strip()
         targetClasses.append(target)
         # Extract the unique identifier for the symbol
-        #ui = data[i][0]
         elements = str(data[i][0]).split("_")
         id = elements[len(elements) - 1]
 
@@ -59,11 +54,7 @@ def stackFeatures(stackFile, sampleListFile):
             stack = np.zeros((sampleSize, stackCache.shape[1]))
 
         # Merge this flattened image into our stack
-        #stack[i] =  stackCache[int(id)]
-        #print("Looking up ui=", ui)
-        #stack[i] = stackCache[uiToIndex[ui]]
         stack[i] = stackCache[int(id)]
-        # print("i=", i, ", id=", id)
     targetClasses = np.array(targetClasses, dtype=np.dtype('a16'))
     return stack,targetClasses
 
@@ -169,7 +160,7 @@ def main():
     print(trainJunkSymbols.shape)
 
     print(np.isnan(trainSymbols[:, 1:]).any())
-    # train_rf_model(trainSymbols, trainTargetSymbols, "encoder_rf.pkl", "pickle_rf.pkl")
+    train_rf_model(trainSymbols, trainTargetSymbols, "encoder_rf.pkl", "pickle_rf.pkl")
     train_kd_model(trainSymbols, trainTargetSymbols, "encoder_kD.pkl", "pickle_kd.pkl")
 
     # train both junk and symbol
