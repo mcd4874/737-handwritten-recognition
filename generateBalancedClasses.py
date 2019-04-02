@@ -104,6 +104,18 @@ def generateBalancedClasses(sourceFile, outputFile):
     f.close()
     return
 
+def generateCombination(file1, file2, output):
+    data1 = np.genfromtxt(file1, delimiter=',', dtype=str)
+    data2 = np.genfromtxt(file2, delimiter=',', dtype=str)
+
+    f = open(output, "w+")
+    for i in range(len(data1)):
+        f.write('' + data1[i][0]+  ',' + data1[i][1] + '\n')
+    for i in range(len(data2)):
+        f.write('' + data2[i][0]+ ',' + data2[i][1] + '\n')
+    f.close()
+    return
+
 def main():
     # Cache the ui to filename mappings
     uiToFilename = dict()
@@ -114,6 +126,11 @@ def main():
     generateTrainTestSplit("./trainingSymbols/iso_GT.txt", "./trainingSymbols/iso_GT_train.txt", "./trainingSymbols/iso_GT_test.txt", uiToFilename, "./trainingSymbols/iso_GT_test_eval.txt")
     generateTrainTestSplit("./trainingJunk/junk_GT_v3.txt", "./trainingJunk/junk_GT_train.txt",
                            "./trainingJunk/junk_GT_test.txt", uiToFilename, "./trainingJunk/junk_GT_test_eval.txt")
+
+    # Combine symbol and junk train dataset
+    # Combine symbol and junk test dataset
+    generateCombination("./trainingSymbols/iso_GT_train.txt", "./trainingJunk/junk_GT_train.txt", "./trainingSymbols/combined_GT_train.txt")
+    generateCombination("./trainingSymbols/iso_GT_test.txt", "./trainingJunk/junk_GT_test.txt", "./trainingSymbols/combined_GT_test.txt")
 
     # Resample the real training symbols for train/test splits
     #generateBalancedClasses("./trainingSymbols/iso_GT_train.txt", "./trainingSymbols/iso_GT_train_resampled.txt")
