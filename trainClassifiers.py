@@ -55,7 +55,7 @@ def stackFeatures(stackFile, sampleListFile):
 
         # Merge this flattened image into our stack
         stack[i] =  stackCache[int(id)]
-        # print("i=", i, ", id=", id)
+        print("i=", i, ", id=", id)
     targetClasses = np.array(targetClasses, dtype=np.dtype('a16'))
     # print(targetClasses.shape)
     # print(stack.shape)
@@ -85,6 +85,7 @@ def transformLabels(targetClasses,encoderModel):
 def inverseTransformLabels(targetClasses,encoderModel):
     return encoderModel.inverse_transform(targetClasses)
 
+<<<<<<< HEAD
 
 
 def train_kd_model(trainSymbols,trainTargetSymbols,encoderPath,modelPath):
@@ -118,9 +119,8 @@ def train_rf_model(trainSymbols,trainTargetSymbols,encoderPath,modelPath):
     with open(modelPath, 'wb') as file:
         pickle.dump(rf, file, -1)
     return
+
 def main():
-    maxTrees = 100
-    maxDepth = 20
 
 
     trainTrunk, trainTargetTrunk = stackFeatures("./junkStack.csv", "./trainingJunk/junk_GT_train.txt")
@@ -134,12 +134,16 @@ def main():
     print(trainSymbols.shape)
     print(trainJunkSymbols.shape)
 
-    # train_rf_model(trainSymbols, trainTargetSymbols, "encoder_rf.pkl", "pickle_rf.pkl")
-    # train_kd_model(trainSymbols, trainTargetSymbols, "encoder_kD.pkl", "pickle_kd.pkl")
+    train_rf_model(trainSymbols, trainTargetSymbols, "encoder_rf.pkl", "pickle_rf.pkl")
+    train_kd_model(trainSymbols, trainTargetSymbols, "encoder_kD.pkl", "pickle_kd.pkl")
 
     # train both junk and symbol
-    # train_rf_model(trainJunkSymbols,targetJunkSymbols,"encoder_both_rf.pkl","pickle_both_rf.pkl")
-    # train_kd_model(trainJunkSymbols,targetJunkSymbols,"encoder_both_kD.pkl","pickle_both_kd.pkl")
+    
+    train_rf_model(trainJunkSymbols,targetJunkSymbols,"encoder_both_rf.pkl","pickle_both_rf.pkl")
+    train_kd_model(trainJunkSymbols,targetJunkSymbols,"encoder_both_kD.pkl","pickle_both_kd.pkl")
+
+
+
 
 
 
