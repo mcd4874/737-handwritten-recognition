@@ -62,16 +62,7 @@ def stackFeatures(stackFile, sampleListFile):
     return stack,targetClasses
 
 def trainKDTreeClassifier(stack,targetClasses):
-    # print("About to run KDTree")
-    # kdtree = KDTree(stack)
-    # print("About to query KDTree")
-    # dist, ind = kdtree.query(stack[1], k=3)
-    # print("indices of 3 closest = ", ind)
-    # print("distances of 3 closest = ", dist)
-
-    #kdTree = KDTree(stack[:, 1:], leaf_size=2)
     kdTree = KNeighborsClassifier(n_neighbors=1, algorithm='kd_tree')
-
     # Train with the data skipping the 0th column containing the UI
     kdTree.fit(stack[:, 1:],targetClasses)
 
@@ -79,7 +70,6 @@ def trainKDTreeClassifier(stack,targetClasses):
 
 def trainRandomForestClassifier(stack, targetClasses, maxTrees, maxDepth):
     rf = RandomForestClassifier(n_estimators=maxTrees, max_depth=maxDepth)
-
     # Train with the data skipping the 0th column containing the UI
     rf.fit(stack[:, 1:],targetClasses)
     return rf
@@ -95,25 +85,29 @@ def transformLabels(targetClasses,encoderModel):
 def inverseTransformLabels(targetClasses,encoderModel):
     return encoderModel.inverse_transform(targetClasses)
 
-def train_model(trainSymbols,trainTargetSymbols,encoderPath,modelPath):
-    encoderModel = generateLabelsEncoder(trainTargetSymbols)
 
+
+def train_kd_model(trainSymbols,trainTargetSymbols,encoderPath,modelPath):
+    encoderModel = generateLabelsEncoder(trainTargetSymbols)
 
     with open(encoderPath, 'wb') as file:
         pickle.dump(encoderModel, file, -1)
-    #
-    print(encoderModel.classes_)
+
     labelTrainTarget = transformLabels(trainTargetSymbols, encoderModel)
-    # labelTestTarget = transformLabels(testTargetSymbols,encoderModel)
-    print("train target: ",labelTrainTarget)
-    # print("test target: ",labelTestTarget)
 
-    # kdtree = trainKDTreeClassifier(trainSymbols, trainTargetSymbols)
-    # pkl_filename = "pickle_kdtree.pkl"
-    # with open(pkl_filename, 'wb') as file:
-    #    pickle.dump(kdtree, file, -1)
+    kdtree = trainKDTreeClassifier(trainSymbols, trainTargetSymbols)
+    with open(modelPath, 'wb') as file:
+       pickle.dump(kdtree, file, -1)
+    return
 
-    # testKDTreeClassifier(testSymbols,testTargetSymbols, kdtree,encoderModel)
+def train_rf_model(trainSymbols,trainTargetSymbols,encoderPath,modelPath):
+    encoderModel = generateLabelsEncoder(trainTargetSymbols)
+
+    with open(encoderPath, 'wb') as file:
+        pickle.dump(encoderModel, file, -1)
+
+    labelTrainTarget = transformLabels(trainTargetSymbols, encoderModel)
+
     maxTrees = 100
     maxDepth = 20
     rf = trainRandomForestClassifier(trainSymbols, labelTrainTarget, maxTrees, maxDepth)
@@ -123,23 +117,16 @@ def train_model(trainSymbols,trainTargetSymbols,encoderPath,modelPath):
     # pkl_filename = "pickle_rf.pkl"
     with open(modelPath, 'wb') as file:
         pickle.dump(rf, file, -1)
-
-    # testRandomForestClassifier(testSymbols, testTargetSymbols, rf, encoderModel)
     return
-
-
 def main():
     maxTrees = 100
     maxDepth = 20
 
 
     trainTrunk, trainTargetTrunk = stackFeatures("./junkStack.csv", "./trainingJunk/junk_GT_train.txt")
-    print (np.unique(trainTargetTrunk))
-    # testSymbols, testTargetSymbols = stackFeatures("./symbolStack.csv", "./trainingSymbols/iso_GT_test.txt")
 
     # Don't use resampled dataset because this is simulating KNN-1; resampled data is not adding any value
     trainSymbols, trainTargetSymbols = stackFeatures("./symbolStack.csv", "./trainingSymbols/iso_GT_train.txt")
-    # testSymbols, testTargetSymbols = stackFeatures("./symbolStack.csv", "./trainingSymbols/iso_GT_test.txt")
 
     trainJunkSymbols = np.concatenate((trainSymbols, trainTrunk), axis=0)
     targetJunkSymbols = np.concatenate((trainTargetSymbols, trainTargetTrunk), axis=0)
@@ -147,41 +134,16 @@ def main():
     print(trainSymbols.shape)
     print(trainJunkSymbols.shape)
 
-    train_model(trainJunkSymbols,targetJunkSymbols,"encoderBoth.pkl","pickle_rf.pkl")
+    # train_rf_model(trainSymbols, trainTargetSymbols, "encoder_rf.pkl", "pickle_rf.pkl")
+    # train_kd_model(trainSymbols, trainTargetSymbols, "encoder_kD.pkl", "pickle_kd.pkl")
+
+    # train both junk and symbol
+    # train_rf_model(trainJunkSymbols,targetJunkSymbols,"encoder_both_rf.pkl","pickle_both_rf.pkl")
+    # train_kd_model(trainJunkSymbols,targetJunkSymbols,"encoder_both_kD.pkl","pickle_both_kd.pkl")
 
 
-    #trainSymbols, trainTargetSymbols = stackFeatures("./symbolStack.csv", "./trainingSymbols/iso_GT_train_resampled.txt")
-    #testSymbols, testTargetSymbols = stackFeatures("./symbolStack.csv", "./trainingSymbols/iso_GT_test_resampled.txt")
 
-    # encoderModel = generateLabelsEncoder(trainTargetSymbols)
-    # encoderModel = generateLabelsEncoder(trainJunkSymbols)
-    # pkl_filenameEncoder = "encoder.pkl"
-    # pkl_filenameEncoder = "encoderBoth.pkl"
-    # with open(pkl_filenameEncoder, 'wb') as file:
-    #     pickle.dump(encoderModel, file, -1)
-    # #
-    # # print(encoderModel.classes_)
-    # labelTrainTarget = transformLabels(trainTargetSymbols,encoderModel)
-    # labelTestTarget = transformLabels(testTargetSymbols,encoderModel)
-    # print("train target: ",labelTrainTarget)
-    # print("test target: ",labelTestTarget)
 
-    #kdtree = trainKDTreeClassifier(trainSymbols, trainTargetSymbols)
-    #pkl_filename = "pickle_kdtree.pkl"
-    #with open(pkl_filename, 'wb') as file:
-    #    pickle.dump(kdtree, file, -1)
-
-    #testKDTreeClassifier(testSymbols,testTargetSymbols, kdtree,encoderModel)
-
-    # rf = trainRandomForestClassifier(trainSymbols, trainTargetSymbols, maxTrees, maxDepth)
-    #
-    # # Save the RandomForestClassifier for later use
-    # # https://stackabuse.com/scikit-learn-save-and-restore-models/
-    # pkl_filename = "pickle_rf.pkl"
-    # with open(pkl_filename, 'wb') as file:
-    #     pickle.dump(rf, file, -1)
-
-    #testRandomForestClassifier(testSymbols, testTargetSymbols, rf, encoderModel)
     return
 
 main()

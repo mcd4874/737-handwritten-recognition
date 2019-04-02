@@ -118,34 +118,20 @@ def inverseTransformLabels(targetClasses,encoderModel):
 def get_list_indices_predict(testSamplesFile, labelTestTarget, classifier, encoderModel):
     resultList = []
 
-    # predict = kdtree.predict(testSamplesFile)
     predict_probs = classifier.predict_proba(testSamplesFile[:, 1:])
     # print("sahpe of probs : ", predict_probs.shape)
     sort_predict_probs_indices = predict_probs.argsort(axis = 1)[:,-10:]
-    # print(sort_predict_probs_indices)
-    # print("sort probs shape:",sort_predict_probs_indices.shape)
     result = np.chararray(sort_predict_probs_indices.shape, itemsize=20)
-    # predict_label = np.chararray(predict.shape, itemsize=20)
     for i in range(result.shape[0]):
         resultVector = []
-        # predict_label[i] = encoderModel.classes_[predict[i]]
         for j in range(result.shape[1]):
             result[i][j] = encoderModel.classes_[sort_predict_probs_indices[i][j]]
             resultVector.append(cleanString(result[i][j]))
         result[i] = result[i][::-1]
         resultList.append(resultVector)
-    # print(result[980:1000])
-    # print(predict_label[980:1000])
-    # result.append(encoderModel.classes_[sort_predict_probs_indices[i]])
-
-    #return result
     return resultList
 
 def test_model(testSymbols,labelTestTarget, stack, encoderPath, modelPath):
-    # encoderModel = generateLabelsEncoder(testTargetSymbols)
-
-
-
     with open(encoderPath, 'rb') as file:
         encoderModel = pickle.load(file)
     print("Finished loading encoder.")
@@ -153,7 +139,7 @@ def test_model(testSymbols,labelTestTarget, stack, encoderPath, modelPath):
 
 
     labelTestTarget = transformLabels(labelTestTarget, encoderModel)
-    print("test target: ", labelTestTarget)
+    # print("test target: ", labelTestTarget)
 
     # Load the kdtree from our pickle
     # print("Loading kdtree from pickle...")
@@ -191,11 +177,18 @@ def main():
     testTargetJunkSymbols = np.concatenate((testTargetSymbols, testTargetJunk), axis=0)
     uiJunkStack = np.concatenate((uiStack, junkStack), axis=0)
 
-    encoderPath = "encoderBoth.pkl"
-    modelPath = "pickle_rf.pkl"
+    encoderPath = "encoder_rf.pkl"
+    rfModelPath = "pickle_rf.pkl"
+    kdModelPath = "pickle_kd.pkl"
+    test_model(testSymbols, testTargetSymbols, uiStack, encoderPath, rfModelPath)
+    test_model(testSymbols, testTargetSymbols, uiStack, encoderPath, kdModelPath)
 
-    test_model(testJunkSymbols,testTargetJunkSymbols,uiJunkStack,encoderPath,modelPath)
+    encoderBothPath = "encoder_both_rf.pkl"
+    rfModelBothPath = "pickle_both_rf.pkl"
+    kdModelBothPath = "pickle_both_kd.pkl"
 
+    test_model(testJunkSymbols, testTargetJunkSymbols, uiJunkStack, encoderBothPath, rfModelBothPath)
+    test_model(testJunkSymbols, testTargetJunkSymbols, uiJunkStack, encoderBothPath, kdModelBothPath)
     # encoderModel = generateLabelsEncoder(testTargetSymbols)
     # encoderModel = generateLabelsEncoder(testTargetSymbols)
 
