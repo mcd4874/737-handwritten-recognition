@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import math
 from generateFeatureStack import cacheUItoFilename
 
-def generateTrainTestSplit(sourceFile, trainFile, testFile, uiToFilename):
+def generateTrainTestSplit(sourceFile, trainFile, testFile, uiToFilename, testFileForEval):
     # Extract the path prefix
     elements = sourceFile.split('/')
     prefix = "./" + elements[1] + "/"
@@ -24,6 +24,7 @@ def generateTrainTestSplit(sourceFile, trainFile, testFile, uiToFilename):
     # Open the output files for writing
     fTest = open(testFile, "w+")
     fTrain = open(trainFile, "w+")
+    fEval = open(testFileForEval, "w+")
 
     # 70% Train, 30% Test
     for i in range(0, len(classes)):
@@ -45,6 +46,9 @@ def generateTrainTestSplit(sourceFile, trainFile, testFile, uiToFilename):
             print("key=", symbolSamples[j][0], ", filename=", uiToFilename[symbolSamples[j][0]])
             fTest.write('' + uiToFilename[symbolSamples[j][0]] + ',' + symbolSamples[j][1] + '\n')
 
+            # Write out the "evalSymIsole.py" compatible test output file
+            fEval.write('' + symbolSamples[j][0] + ',' + symbolSamples[j][1] + '\n')
+
         # Write Train samples (testCount, totalCount)
         for j in range(testCount, len(symbolSamples)):
             fTrain.write('' + symbolSamples[j][0] + ',' + symbolSamples[j][1] + '\n')
@@ -52,6 +56,7 @@ def generateTrainTestSplit(sourceFile, trainFile, testFile, uiToFilename):
     # Close the output files
     fTest.close()
     fTrain.close()
+    fEval.close()
 
     return
 
@@ -106,9 +111,9 @@ def main():
     cacheUItoFilename(uiToFilename, "./trainingJunk/")
 
     # Training/Test split by each symbol class
-    generateTrainTestSplit("./trainingSymbols/iso_GT.txt", "./trainingSymbols/iso_GT_train.txt", "./trainingSymbols/iso_GT_test.txt", uiToFilename)
+    generateTrainTestSplit("./trainingSymbols/iso_GT.txt", "./trainingSymbols/iso_GT_train.txt", "./trainingSymbols/iso_GT_test.txt", uiToFilename, "./trainingSymbols/iso_GT_test_eval.txt")
     generateTrainTestSplit("./trainingJunk/junk_GT_v3.txt", "./trainingJunk/junk_GT_train.txt",
-                           "./trainingJunk/junk_GT_test.txt", uiToFilename)
+                           "./trainingJunk/junk_GT_test.txt", uiToFilename, "./trainingJunk/junk_GT_test_eval.txt")
 
     # Resample the real training symbols for train/test splits
     #generateBalancedClasses("./trainingSymbols/iso_GT_train.txt", "./trainingSymbols/iso_GT_train_resampled.txt")
