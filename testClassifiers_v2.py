@@ -198,6 +198,43 @@ def mainOLD():
     r.to_csv("report_table_rf.csv",index = False,header = False, encoding="utf-8", quoting=csv.QUOTE_NONE)
     return
 
+def test_model(testSymbols, labelTestTarget, stack, encoderPath, modelPath, outputFile):
+    with open(encoderPath, 'rb') as file:
+        encoderModel = pickle.load(file)
+    print("Finished loading encoder.")
+    print(encoderModel.classes_)
+
+    labelTestTarget = transformLabels(labelTestTarget, encoderModel)
+    # print("test target: ", labelTestTarget)
+
+    # Load the kdtree from our pickle
+    # print("Loading kdtree from pickle...")
+    # with open(modelPath, 'rb') as file:
+    #     kdtree = pickle.load(file)
+    # print("Finished loading.")
+
+    # testKDTreeClassifier(testSymbols, testTargetSymbols, kdtree, encoderModel, uiStack)
+    # list_test_best_label_predict = get_list_indices_predict(testSymbols,labelTestTarget, rf, encoderModel)
+    # df1 = pd.DataFrame(uiStack)
+    # df2 = pd.DataFrame(list_test_best_label_predict)
+    # r = pd.concat([df1,df2],axis=1)
+    # r.to_csv("report_table_kdtree.csv",index = False,header = False, encoding="utf-8", quoting=csv.QUOTE_NONE)
+
+    # Load the RandomForestClassifier from our pickle
+    # https://stackabuse.com/scikit-learn-save-and-restore-models/
+    print("Loading model from pickle...")
+    with open(modelPath, 'rb') as file:
+        rf = pickle.load(file)
+    print("Finished loading.")
+
+    testRandomForestClassifier(testSymbols, labelTestTarget, rf, encoderModel, stack)
+    list_test_best_label_predict = get_list_indices_predict(testSymbols, rf, encoderModel)
+    df1 = pd.DataFrame(stack)
+    df2 = pd.DataFrame(list_test_best_label_predict)
+    r = pd.concat([df1, df2], axis=1)
+    r.to_csv(outputFile, index=False, header=False, encoding="utf-8", quoting=csv.QUOTE_NONE)
+
+
 def main():
     # Print usage...
     if(len(sys.argv) < 4):
@@ -206,7 +243,11 @@ def main():
         print("")
         print("  <inputFile> contains a list of .inkml filenames")
         print("  <outputFile> output csv file containing UI, Top10 recognitions")
-        print("  <classifierIdentifier> is kdtree or randomforest")
+        print("  <classifierIdentifier> is one of the following:")
+        print("                                                   kdtreeSymbols")
+        print("                                                   kdtreeCombined")
+        print("                                                   randomForestSymbols")
+        print("                                                   randomForestCombined")
         print("")
         return
 
@@ -221,36 +262,26 @@ def main():
 
     print("Input:", inputFile, ", Output:", outputFile, ", classifier:", classifierIdentifier)
 
+    # Pickled Models...
+    encoderPath = "encoder_rf.pkl"
+    rfModelPath = "pickle_rf.pkl"
+    kdModelPath = "pickle_kd.pkl"
+    encoderBothPath = "encoder_both_rf.pkl"
+    rfModelBothPath = "pickle_both_rf.pkl"
+    kdModelBothPath = "pickle_both_kd.pkl"
+
     # Generate the feature stack based upon the inkml files in the inputFile
     uiStack, featureStack, targetStack = getFeatures(inputFile)
 
-    # Load the encoder model from pickle...
-    print("Loading encoder model from pickle...")
-    pkl_filename = "pickle_encoder.pkl"
-    with open(pkl_filename, 'rb') as file:
-        encoderModel = pickle.load(file)
-    print("Finished loading.")
-
-    # Selectively process accuracy outputs if targetStack is non-empty
-    if(len(targetStack) > 0):
-        print("")
-
     # Predict using randomforest
-    if "randomforest" in classifierIdentifier:
-        # Load the RandomForestClassifier from our pickle
-        # https://stackabuse.com/scikit-learn-save-and-restore-models/
-        print("Loading random forest from pickle...")
-        pkl_filename = "pickle_rf.pkl"
-        with open(pkl_filename, 'rb') as file:
-            rf = pickle.load(file)
-        print("Finished loading.")
-
-        testRandomForestClassifier(featureStack, targetStack, rf, encoderModel, uiStack)
-        list_test_best_label_predict = get_list_indices_predict(featureStack, rf, encoderModel)
-        df1 = pd.DataFrame(uiStack)
-        df2 = pd.DataFrame(list_test_best_label_predict)
-        r = pd.concat([df1, df2], axis=1)
-        r.to_csv(outputFile, index=False, header=False, encoding="utf-8", quoting=csv.QUOTE_NONE)
+    if "randomForestSymbols" in classifierIdentifier:
+        test_model(featureStack, targetStack, uiStack, encoderPath, rfModelPath, outputFile)
+    if "randomForestCombined" in classifierIdentifier:
+        test_model(featureStack, targetStack, uiStack, encoderBothPath, rfModelBothPath, outputFile)
+    if "kdtreeSymbols" in classifierIdentifier:
+        test_model(featureStack, targetStack, uiStack, encoderPath, kdModelPath, outputFile)
+    if "kdtreeCombined" in classifierIdentifier:
+        test_model(featureStack, targetStack, uiStack, encoderBothPath, kdModelBothPath, outputFile)
 
     return
 

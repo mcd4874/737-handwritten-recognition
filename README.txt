@@ -29,8 +29,7 @@ generateFeatureStack.pu         - Library file containing helper methods used by
                                     processed into feature , as well as mapping functionality to translate
                                     between UI and filenames.
 
-trainClassifiers.py             - Trains the kdtree and randomforest classifiers for the "./symbolStack.csv"
-                                  Tests the accuracy of the kdtree and randomforest classifiers
+trainClassifiers.py             - Trains the kdtree and randomforest classifiers for the the valid & valid+junk datasets
 
                                   Contains hyperparameters for configuration of randomforest:
                                     maxTrees = maximum number of trees in the random forest
@@ -52,6 +51,16 @@ testClassifiers_v2.py           -  Tests the pickled kdtree and randomforest cla
                                         <classifierIdentifier> is kdtree or randomforest
 
                                     Example:
-                                        testClassifiers.py ./trainingSymbols/iso_GT_test.txt randomforest-output.csv randomforest
+                                        testClassifiers.py ./trainingSymbols/iso_GT_test.txt randomForestSymbols-output.csv randomForestSymbols
+                                        testClassifiers.py ./trainingSymbols/iso_GT_combined.txt randomForestCombined-output.csv randomForestCombined
+                                        testClassifiers.py ./trainingSymbols/iso_GT_test.txt kdtreeSymbols-output.csv kdtreeSymbols
+                                        testClassifiers.py ./trainingSymbols/iso_GT_combined.txt kdtreeCombined-output.csv kdtreeCombined
+
 
                                     Creates outputFile in the form of "<UI>, <Top10-descending-order>"
+
+
+
+
+
+
