@@ -68,25 +68,47 @@ def stackFeatures(stackFile, sampleListFile):
     # print(stack.shape)
     return stack, targetClasses, uiStack
 
-def testKDTreeClassifier(testSamplesFile, labelTestTarget, kdtree, encoderModel, uiStack):
-    predict = kdtree.predict(testSamplesFile[:, 1:])
-    #dist, ind = kdtree.query(testSamplesFile[:, 1:])
-    #print("ind = ", ind)
+def testKDTreeClassifier(testSamplesFile, labelTestTarget, kdtree, labels, uiStack):
+    predict = kdtree.predict(testSamplesFile[:, 0:])
 
-    print("prediction: ",predict)
-    print("actual label : ",labelTestTarget)
-    print(confusion_matrix(labelTestTarget, predict, labels=None))
-    print(classification_report(labelTestTarget, predict, target_names=None))
+    # only display recognition rates if labelTestTarget is provided
+    if len(labelTestTarget) > 0:
+        print("rf prediction: ", predict)
+        print("rf actual label: ", labelTestTarget)
+        print("Manual confusion matrix:")
+
+        matrix = confusion_matrix(labelTestTarget, predict, labels=None)
+
+        # Print Column Headers for confusion matrix
+        print("", end=",")  # Initial spacer for header row
+        for i in range(len(matrix[0])):
+            print(labels[i], end=",")
+        print("")
+        for i in range(len(matrix)):
+            # Prubt Row Headers for confusion matrix
+            print(labels[i], end=",")
+            for j in range(len(matrix[i])):
+                print(matrix[i][j], end=",")
+            print("")
+        print(confusion_matrix(labelTestTarget, predict, labels=None))
+        print(classification_report(labelTestTarget, predict, target_names=labels))
     return
 
 def cleanString(string):
     elements = str(string).split("'")
     return elements[1];
 
-def testRandomForestClassifier(testSamplesFile, labelTestTarget, rf, encoderModel, uiStack):
+def testRandomForestClassifier(testSamplesFile, labelTestTarget, rf, labels, uiStack):
     #The [:, 1:] is needed to skip "nan" ui first column...
     #predict = rf.predict(testSamplesFile[:, 1:])
     predict = rf.predict(testSamplesFile[:, 0:])
+
+    combine = np.column_stack((predict, labelTestTarget))
+    uniquesLabelSets = np.unique(combine,axis=0)
+    labelTags = list()
+    for i in range(len(uniquesLabelSets)):
+        labelTags.append(encoderModel.classes_[uniquesLabelSets[i]])
+    print("tag target: ", labelTags)
 
     # only display recognition rates if labelTestTarget is provided
     if len(labelTestTarget) > 0:
@@ -99,16 +121,16 @@ def testRandomForestClassifier(testSamplesFile, labelTestTarget, rf, encoderMode
         # Print Column Headers for confusion matrix
         print ("", end=",")  # Initial spacer for header row
         for i in range(len(matrix[0])):
-            print (encoderModel.classes_[i], end=",")
+            print (labels[i], end=",")
         print("")
         for i in range(len(matrix)):
             # Prubt Row Headers for confusion matrix
-            print (encoderModel.classes_[i], end=",")
+            print (labels[i], end=",")
             for j in range(len(matrix[i])):
                 print (matrix[i][j], end=",")
             print("")
         print(confusion_matrix(labelTestTarget, predict, labels=None))
-        print(classification_report(labelTestTarget, predict, target_names=None))
+        print(classification_report(labelTestTarget, predict, target_names=labels))
     return
 
 def generateLabelsEncoder(targetClasses):
@@ -205,7 +227,11 @@ def test_model(testSymbols, labelTestTarget, stack, encoderPath, modelPath, outp
     print(encoderModel.classes_)
 
     labelTestTarget = transformLabels(labelTestTarget, encoderModel)
-    # print("test target: ", labelTestTarget)
+
+
+
+
+
 
     # Load the kdtree from our pickle
     # print("Loading kdtree from pickle...")
@@ -227,7 +253,7 @@ def test_model(testSymbols, labelTestTarget, stack, encoderPath, modelPath, outp
         rf = pickle.load(file)
     print("Finished loading.")
 
-    testRandomForestClassifier(testSymbols, labelTestTarget, rf, encoderModel, stack)
+    testRandomForestClassifier(testSymbols, labelTestTarget, rf, labelTags, stack)
     list_test_best_label_predict = get_list_indices_predict(testSymbols, rf, encoderModel)
     df1 = pd.DataFrame(stack)
     df2 = pd.DataFrame(list_test_best_label_predict)

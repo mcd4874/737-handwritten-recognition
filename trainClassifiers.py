@@ -63,7 +63,7 @@ def stackFeatures(stackFile, sampleListFile):
         #print("Looking up ui=", ui)
         #stack[i] = stackCache[uiToIndex[ui]]
         stack[i] = stackCache[int(id)]
-        print("i=", i, ", id=", id)
+        # print("i=", i, ", id=", id)
     targetClasses = np.array(targetClasses, dtype=np.dtype('a16'))
     return stack,targetClasses
 
@@ -88,6 +88,21 @@ def transformLabels(targetClasses,encoderModel):
     return encoderModel.transform(targetClasses)
 
 
+def trainKDTreeClassifier(stack, targetClasses):
+    kdTree = KNeighborsClassifier(n_neighbors=1, algorithm='kd_tree')
+    # Train with the data skipping the 0th column containing the UI
+    kdTree.fit(stack[:, 1:], targetClasses)
+
+    return kdTree
+
+
+def trainRandomForestClassifier(stack, targetClasses, maxTrees, maxDepth):
+    rf = RandomForestClassifier(n_estimators=maxTrees, max_depth=maxDepth)
+    # Train with the data skipping the 0th column containing the UI
+    rf.fit(stack[:, 1:], targetClasses)
+    return rf
+
+
 def train_kd_model(trainSymbols,trainTargetSymbols,encoderPath,modelPath):
     """
     this function will train a KNN model with n=1 using kd tree algorithm
@@ -103,10 +118,11 @@ def train_kd_model(trainSymbols,trainTargetSymbols,encoderPath,modelPath):
         pickle.dump(encoderModel, file, -1)
 
     labelTrainTarget = transformLabels(trainTargetSymbols, encoderModel)
-
-    kdtree = trainKDTreeClassifier(trainSymbols, trainTargetSymbols)
+    kdtree= KNeighborsClassifier(n_neighbors=1,algorithm = 'kd_tree' )
+    kdtree.fit(trainSymbols[:, 1:], labelTrainTarget)
     with open(modelPath, 'wb') as file:
        pickle.dump(kdtree, file, -1)
+    print("finish train kd tree")
     return
 
 def train_rf_model(trainSymbols,trainTargetSymbols,encoderPath,modelPath):
@@ -127,13 +143,15 @@ def train_rf_model(trainSymbols,trainTargetSymbols,encoderPath,modelPath):
 
     maxTrees = 100
     maxDepth = 20
-    rf = trainRandomForestClassifier(trainSymbols, labelTrainTarget, maxTrees, maxDepth)
+    rf = RandomForestClassifier(n_estimators=maxTrees, max_depth=maxDepth)
+    rf = rf.fit(trainSymbols[:, 1:], labelTrainTarget)
 
     # Save the RandomForestClassifier for later use
     # https://stackabuse.com/scikit-learn-save-and-restore-models/
     # pkl_filename = "pickle_rf.pkl"
     with open(modelPath, 'wb') as file:
         pickle.dump(rf, file, -1)
+    print("finish train random forest")
     return
 
 def main():
@@ -150,7 +168,8 @@ def main():
     print(trainSymbols.shape)
     print(trainJunkSymbols.shape)
 
-    train_rf_model(trainSymbols, trainTargetSymbols, "encoder_rf.pkl", "pickle_rf.pkl")
+    print(np.isnan(trainSymbols[:, 1:]).any())
+    # train_rf_model(trainSymbols, trainTargetSymbols, "encoder_rf.pkl", "pickle_rf.pkl")
     train_kd_model(trainSymbols, trainTargetSymbols, "encoder_kD.pkl", "pickle_kd.pkl")
 
     # train both junk and symbol

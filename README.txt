@@ -22,7 +22,7 @@ generateNormalizedImages_v2.py  - Parses all inkml files in ./trainingSymbols an
                                     binCount = histogram bin count for angles between consecutive points
                                     featureCount = total number of angles between consecutive points
 
-generateFeatureStack.pu         - Library file containing helper methods used by testClassifiers_v2.py and
+generateFeatureStack.py        - Library file containing helper methods used by testClassifiers_v2.py and
                                     generateBalancedClasses.py.
 
                                   This file contains helper functions that allow for test input files to be
