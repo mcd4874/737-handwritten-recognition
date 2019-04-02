@@ -33,6 +33,12 @@ def stackFeatures(stackFile, sampleListFile):
 
     # Load the stackFile
     stackCache = np.genfromtxt(stackFile, delimiter=',', dtype=float)
+    #stackCacheString = np.genfromtxt(stackFile, delimiter=',', dtype=str)
+
+    # Create a dictionary from UI to stackCache index
+    #uiToIndex = dict()
+    #for i in range(len(stackCache)):
+    #    uiToIndex[stackCacheString[i][0]] = i
 
     stack = None
 
@@ -44,6 +50,7 @@ def stackFeatures(stackFile, sampleListFile):
         target = data[i][1].strip()
         targetClasses.append(target)
         # Extract the unique identifier for the symbol
+        #ui = data[i][0]
         elements = str(data[i][0]).split("_")
         id = elements[len(elements) - 1]
 
@@ -52,7 +59,10 @@ def stackFeatures(stackFile, sampleListFile):
             stack = np.zeros((sampleSize, stackCache.shape[1]))
 
         # Merge this flattened image into our stack
-        stack[i] =  stackCache[int(id)]
+        #stack[i] =  stackCache[int(id)]
+        #print("Looking up ui=", ui)
+        #stack[i] = stackCache[uiToIndex[ui]]
+        stack[i] = stackCache[int(id)]
         print("i=", i, ", id=", id)
     targetClasses = np.array(targetClasses, dtype=np.dtype('a16'))
     return stack,targetClasses
@@ -128,11 +138,11 @@ def train_rf_model(trainSymbols,trainTargetSymbols,encoderPath,modelPath):
 
 def main():
 
+    # Don't use resampled dataset because this is simulating KNN-1; resampled data is not adding any value
+    trainSymbols, trainTargetSymbols = stackFeatures("./symbolStack.csv", "./trainingSymbols/iso_GT_train.txt")
 
     trainTrunk, trainTargetTrunk = stackFeatures("./junkStack.csv", "./trainingJunk/junk_GT_train.txt")
 
-    # Don't use resampled dataset because this is simulating KNN-1; resampled data is not adding any value
-    trainSymbols, trainTargetSymbols = stackFeatures("./symbolStack.csv", "./trainingSymbols/iso_GT_train.txt")
 
     trainJunkSymbols = np.concatenate((trainSymbols, trainTrunk), axis=0)
     targetJunkSymbols = np.concatenate((trainTargetSymbols, trainTargetTrunk), axis=0)
@@ -147,13 +157,6 @@ def main():
 
     train_rf_model(trainJunkSymbols,targetJunkSymbols,"encoder_both_rf.pkl","pickle_both_rf.pkl")
     train_kd_model(trainJunkSymbols,targetJunkSymbols,"encoder_both_kD.pkl","pickle_both_kd.pkl")
-
-
-
-
-
-
-
     return
 
 main()
