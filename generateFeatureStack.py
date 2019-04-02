@@ -67,6 +67,62 @@ def parseStrokesInto3DArray(strokes):
 
     return strokesArray
 
+def loadSampleIntoDictionary(idToUILookup, dictionary, filename):
+    # print("filename: ", filename)
+    tree = ET.parse(filename)
+    root = tree.getroot()
+    id = None
+    strokes = []
+
+    # extract annotation type
+    for child in root.iter():
+        # print("child.tag: ", child.tag, ",  child.attrib: ", child.attrib);
+        if child.tag == '{http://www.w3.org/2003/InkML}annotation' and child.attrib['type'] == 'UI':
+            # Retrieve the unique identifier for this symbol
+            UI = child.text
+
+            # Take the last _'th split as the unique identifier for this sample
+            elements = UI.split("_")
+            id = elements[len(elements) - 1]
+            print("filename = ", filename, ", value = ", child.text, ", type = ", child.attrib['type'])
+
+            # Add the id to UI to our lookup dictionary
+            idToUILookup[id] = UI
+
+        if child.tag == '{http://www.w3.org/2003/InkML}trace':
+            # Retrieve the stroke(s) for this symbol
+            # print("value = ", child.text)
+            strokes.append(child.text)
+
+    # Convert strokes into 3D numpy array: [stroke][x][y]
+    strokes3d = parseStrokesInto3DArray(strokes)
+
+    # Add symbol to our dictionary
+    dictionary[UI] = strokes3d
+    return
+
+# Generates a cache in "uiToFilename" dictionary based on UI -> Filename mapping for
+# all inkml files in the given directoryPath
+def cacheUItoFilename(uiToFilename, directoryPath):
+
+    # Iterate over all of the files
+    fileList = os.listdir(directoryPath)
+    for filename in fileList:
+        if "inkml" in filename:
+            tree = ET.parse(directoryPath + "/" + filename)
+            root = tree.getroot()
+
+            # extract annotation type
+            for child in root.iter():
+                #print("child.tag: ", child.tag, ",  child.attrib: ", child.attrib);
+                if child.tag == '{http://www.w3.org/2003/InkML}annotation' and child.attrib['type'] == 'UI':
+                    # Retrieve the unique identifier for this symbol
+                    UI=child.text
+                    uiToFilename[UI] = directoryPath + filename
+                    print("caching filename: ", directoryPath + filename, " and UI: ", UI)
+
+    return
+
 def loadSamplesIntoDictionary(idToUILookup, dictionary, directoryPath, limit):
     counter = 0
 
@@ -132,7 +188,9 @@ def generateNoConnectImagesOLD(dictionary, path, w, h):
 
 def generateNoConnectImages(dictionary, imageDictionary, w, h):
     size = (h+1, w+1, 1)
-    for id in dictionary:
+    keys = list(dictionary)
+    for i in range(0,len(dictionary)):
+        id = keys[i]
         print("NoConnect: Processing image for ", id)
         img = np.full(size, 255, np.uint8)
 
@@ -149,8 +207,10 @@ def generateNoConnectImages(dictionary, imageDictionary, w, h):
 def generateConnectedImages(dictionary, imageDictionary, w, h, thickness):
     size = (h+1, w+1, 1)
 
+    keys = list(dictionary)
     for i in range(0,len(dictionary)):
-        id = str(i)
+        id = keys[i]
+
         print("Connected: Processing image for ", id)
         img = np.full(size, 255, np.uint8)
 
@@ -192,13 +252,15 @@ def generateFeatureStack(idToUILookup, dictionary):
     stack = []
     uiStack = []
 
+    keys = list(dictionary)
     for i in range(0,len(dictionary)):
-        id = str(i)
+        id = keys[i]
         print("Processing id=", id)
         features = []
 
         # Add the UI to the uiStack
-        uiStack.append(idToUILookup[id])
+        #uiStack.append(idToUILookup[id])
+        uiStack.append(id)
 
         # Process each point
         newStroke = True
@@ -345,8 +407,9 @@ def appendBinFeatures(stack, binCount):
 def appendImageFeatures(stack, imageDictionary):
     newStack = []
 
+    keys = list(imageDictionary)
     for i in range(len(stack)):
-        id = str(i)
+        id = keys[i]
         print("Appending image features for id=", id)
         features = stack[i]
         newFeatures = features.copy()
@@ -361,7 +424,7 @@ def appendImageFeatures(stack, imageDictionary):
 
     return newStack
 
-def main():
+def mainOLD():
     limit = 0
     w = 20
     h = 20
@@ -414,4 +477,59 @@ def main():
     saveCSV(junkUIStack, junkStack, "./junkStack.csv")
     return
 
-main()
+def getFeatures(inputFile):
+    w = 20
+    h = 20
+    thickness = 4
+    sector = 45
+    binCount = 8
+    featureCount = 30
+
+    # Initialize the lists
+    symbolsDictionary = dict()
+    symbolsImageDictionary = dict()
+    symbolIdToUILookup = dict()
+
+    # Load the input file
+    data = np.genfromtxt(inputFile, delimiter=',', dtype=str)
+
+    # Construct the target stack (if its available)
+    targetStack = []
+
+    for i in range(len(data)):
+        #print("Dimensions = ", len(data.shape))
+        if len(data.shape) > 1:
+            print("input: ", data[i][0])
+            loadSampleIntoDictionary(symbolIdToUILookup, symbolsDictionary, data[i][0])
+        else:
+            print("input: ", data[i])
+            loadSampleIntoDictionary(symbolIdToUILookup, symbolsDictionary, data[i])
+
+        if len(data.shape) > 1:
+            # Binarize the target stack
+            print("target: ", data[i][1])
+            targetStack.append(bytes(data[i][1], encoding='utf-8'))
+
+    # Perform normalization to all samples in our dictionary
+    normalizeSamples(symbolsDictionary, w, h)
+
+    # Create "no-connect" images
+    #generateNoConnectImages(symbolsDictionary, symbolsImageDictionary, w, h);
+
+    # Create "connected" images
+    generateConnectedImages(symbolsDictionary, symbolsImageDictionary, w, h, thickness)
+
+    symbolUIStack, symbolStack = generateFeatureStack(symbolIdToUILookup, symbolsDictionary)
+    symbolStack = orientationNormalization(symbolStack, sector)
+    symbolStack = deduplicationNormalization(symbolStack)
+    symbolStack = featureCountNormalization(symbolStack, featureCount)
+    symbolStack = appendBinFeatures(symbolStack, binCount)
+    symbolStack = appendImageFeatures(symbolStack, symbolsImageDictionary)
+
+    #print("stack=", stack)
+
+    saveCSV(symbolUIStack, symbolStack, "./symbolStack.csv")
+
+    # Convert symbolStack to numpy array
+
+    return symbolUIStack, np.array(symbolStack), targetStack;

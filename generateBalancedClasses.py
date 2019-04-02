@@ -6,8 +6,13 @@ from sklearn.utils import resample
 import numpy as np
 import matplotlib.pyplot as plt
 import math
+from generateFeatureStack import cacheUItoFilename
 
-def generateTrainTestSplit(sourceFile, trainFile, testFile):
+def generateTrainTestSplit(sourceFile, trainFile, testFile, uiToFilename):
+    # Extract the path prefix
+    elements = sourceFile.split('/')
+    prefix = "./" + elements[1] + "/"
+
     # Load the dictionary file
     data = np.genfromtxt(sourceFile, delimiter=',', dtype=str)
 
@@ -36,7 +41,9 @@ def generateTrainTestSplit(sourceFile, trainFile, testFile):
 
         # Write Test samples (0, testCount)
         for j in range(0, testCount):
-            fTest.write('' + symbolSamples[j][0] + ',' + symbolSamples[j][1] + '\n')
+            #fTest.write('' + symbolSamples[j][0] + ',' + symbolSamples[j][1] + '\n')
+            print("key=", symbolSamples[j][0], ", filename=", uiToFilename[symbolSamples[j][0]])
+            fTest.write('' + uiToFilename[symbolSamples[j][0]] + ',' + symbolSamples[j][1] + '\n')
 
         # Write Train samples (testCount, totalCount)
         for j in range(testCount, len(symbolSamples)):
@@ -93,14 +100,19 @@ def generateBalancedClasses(sourceFile, outputFile):
     return
 
 def main():
+    # Cache the ui to filename mappings
+    uiToFilename = dict()
+    cacheUItoFilename(uiToFilename, "./trainingSymbols/")
+    cacheUItoFilename(uiToFilename, "./trainingJunk/")
+
     # Training/Test split by each symbol class
-    generateTrainTestSplit("./trainingSymbols/iso_GT.txt", "./trainingSymbols/iso_GT_train.txt", "./trainingSymbols/iso_GT_test.txt")
-    generateTrainTestSplit("./trainingJunk/junk_GT_v2.txt", "./trainingJunk/junk_GT_train.txt",
-                           "./trainingJunk/junk_GT_test.txt")
+    generateTrainTestSplit("./trainingSymbols/iso_GT.txt", "./trainingSymbols/iso_GT_train.txt", "./trainingSymbols/iso_GT_test.txt", uiToFilename)
+    generateTrainTestSplit("./trainingJunk/junk_GT_v3.txt", "./trainingJunk/junk_GT_train.txt",
+                           "./trainingJunk/junk_GT_test.txt", uiToFilename)
 
     # Resample the real training symbols for train/test splits
-    generateBalancedClasses("./trainingSymbols/iso_GT_train.txt", "./trainingSymbols/iso_GT_train_resampled.txt")
-    generateBalancedClasses("./trainingSymbols/iso_GT_test.txt", "./trainingSymbols/iso_GT_test_resampled.txt")
+    #generateBalancedClasses("./trainingSymbols/iso_GT_train.txt", "./trainingSymbols/iso_GT_train_resampled.txt")
+    #generateBalancedClasses("./trainingSymbols/iso_GT_test.txt", "./trainingSymbols/iso_GT_test_resampled.txt")
 
     # Resample the junk symbols (no resampling needed)
     # generateBalancedClasses("./trainingJunk/junk_GT.txt", "./trainingJunk/junk_GT_resampled.txt")
