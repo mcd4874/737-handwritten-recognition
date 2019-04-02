@@ -1,3 +1,9 @@
+"""
+Author: William Duong, Eric Hartman
+This file will extract image data from csv file to train KD model and random forest model
+"""
+
+
 from sklearn.utils import resample
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.neighbors import KDTree
@@ -15,6 +21,13 @@ import cv2
 import pickle
 
 def stackFeatures(stackFile, sampleListFile):
+    """
+    This function will extract image data from the stackFile and combine those data into
+    an numpy array dataset. It will do the same for the target label
+    :param stackFile: input csv file which contains image data
+    :param sampleListFile: input txt file which contains identify to the csv file and the label
+    :return: the stack train input and the stack target classes input
+    """
     # Load the dictionary file
     data = np.genfromtxt(sampleListFile, delimiter=',', dtype=str)
 
@@ -25,8 +38,6 @@ def stackFeatures(stackFile, sampleListFile):
 
     # Iterate over the lines in the sampleList file
     sampleSize = len(data)
-    # sampleSize = 100
-    # for i in range(len(data)):
     targetClasses = list()
     for i in range(sampleSize):
         # Extract the target class
@@ -35,60 +46,47 @@ def stackFeatures(stackFile, sampleListFile):
         # Extract the unique identifier for the symbol
         elements = str(data[i][0]).split("_")
         id = elements[len(elements) - 1]
-        #filename = imagesPath + id + ".png"
-        # print("filename=",  filename)
-        #img = cv2.imread(filename, cv2.IMREAD_GRAYSCALE)
-        #print("img =", img)
-        #print("img type =", type(img))
-
-        #imgRavel = img.ravel()
-        # print(imgRavel.shape)
-        #print("imgRavel = ", imgRavel, " shape is ", imgRavel.shape)
 
         # Lazily allocate the stack array
         if stack is None:
-            #height = img.shape[0]
-            #width = img.shape[1]
-            #print("height and width = ", height, " and ", width)
-            #print("length = ", len(data))
             stack = np.zeros((sampleSize, stackCache.shape[1]))
 
         # Merge this flattened image into our stack
         stack[i] =  stackCache[int(id)]
         print("i=", i, ", id=", id)
     targetClasses = np.array(targetClasses, dtype=np.dtype('a16'))
-    # print(targetClasses.shape)
-    # print(stack.shape)
     return stack,targetClasses
 
-def trainKDTreeClassifier(stack,targetClasses):
-    kdTree = KNeighborsClassifier(n_neighbors=1, algorithm='kd_tree')
-    # Train with the data skipping the 0th column containing the UI
-    kdTree.fit(stack[:, 1:],targetClasses)
-
-    return kdTree
-
-def trainRandomForestClassifier(stack, targetClasses, maxTrees, maxDepth):
-    rf = RandomForestClassifier(n_estimators=maxTrees, max_depth=maxDepth)
-    # Train with the data skipping the 0th column containing the UI
-    rf.fit(stack[:, 1:],targetClasses)
-    return rf
 
 def generateLabelsEncoder(targetClasses):
+    """
+    create label encoder model with target classes label
+    :param targetClasses: vector of target classes label
+    :return: the encoder model
+    """
     enc = LabelEncoder()
     enc.fit(targetClasses)
     return enc
 
 def transformLabels(targetClasses,encoderModel):
+    """
+    This function will convert target classes labels into numeric vectors for one hot encoding
+    :param targetClasses: vector of target classes label
+    :param encoderModel: label encoder model contains target classes labels
+    :return:vector of numeric label
+    """
     return encoderModel.transform(targetClasses)
-
-def inverseTransformLabels(targetClasses,encoderModel):
-    return encoderModel.inverse_transform(targetClasses)
-
-<<<<<<< HEAD
 
 
 def train_kd_model(trainSymbols,trainTargetSymbols,encoderPath,modelPath):
+    """
+    this function will train a KNN model with n=1 using kd tree algorithm
+    :param trainSymbols:input images data matrix
+    :param trainTargetSymbols: input target classes vector
+    :param encoderPath: file path to store the encoder model
+    :param modelPath: file path to store the classifier model
+    :return: model after train
+    """
     encoderModel = generateLabelsEncoder(trainTargetSymbols)
 
     with open(encoderPath, 'wb') as file:
@@ -102,6 +100,14 @@ def train_kd_model(trainSymbols,trainTargetSymbols,encoderPath,modelPath):
     return
 
 def train_rf_model(trainSymbols,trainTargetSymbols,encoderPath,modelPath):
+    """
+    this function will train a random forest model
+    :param trainSymbols:input images data matrix
+    :param trainTargetSymbols: input target classes vector
+    :param encoderPath: file path to store the encoder model
+    :param modelPath: file path to store the classifier model
+    :return: model after train
+    """
     encoderModel = generateLabelsEncoder(trainTargetSymbols)
 
     with open(encoderPath, 'wb') as file:
@@ -138,7 +144,7 @@ def main():
     train_kd_model(trainSymbols, trainTargetSymbols, "encoder_kD.pkl", "pickle_kd.pkl")
 
     # train both junk and symbol
-    
+
     train_rf_model(trainJunkSymbols,targetJunkSymbols,"encoder_both_rf.pkl","pickle_both_rf.pkl")
     train_kd_model(trainJunkSymbols,targetJunkSymbols,"encoder_both_kD.pkl","pickle_both_kd.pkl")
 
