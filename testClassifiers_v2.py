@@ -100,7 +100,9 @@ def test_model(testSymbols, labelTestTarget, stack, encoderPath, modelPath, outp
         rf = pickle.load(file)
     print("Finished loading.")
 
-    testClassifier(testSymbols, labelTestTarget, rf, encoderModel, stack)
+    # Uncomment this to see classifier accuracy scores for the test set if truth was available
+    #testClassifier(testSymbols, labelTestTarget, rf, encoderModel, stack)
+
     list_test_best_label_predict = get_list_indices_predict(testSymbols, rf, encoderModel)
     df1 = pd.DataFrame(stack)
     df2 = pd.DataFrame(list_test_best_label_predict)
