@@ -106,13 +106,13 @@ def train_kd_model(trainSymbols,trainTargetSymbols,encoderPath,modelPath):
     encoderModel = generateLabelsEncoder(trainTargetSymbols)
 
     with open(encoderPath, 'wb') as file:
-        pickle.dump(encoderModel, file, -1)
+        pickle.dump(encoderModel, file, pickle.HIGHEST_PROTOCOL)
 
     labelTrainTarget = transformLabels(trainTargetSymbols, encoderModel)
     kdtree= KNeighborsClassifier(n_neighbors=1,algorithm = 'kd_tree' )
     kdtree.fit(trainSymbols[:, 1:], labelTrainTarget)
     with open(modelPath, 'wb') as file:
-       pickle.dump(kdtree, file, -1)
+       pickle.dump(kdtree, file, pickle.HIGHEST_PROTOCOL)
     print("finish train kd tree")
     return
 
@@ -128,7 +128,7 @@ def train_rf_model(trainSymbols,trainTargetSymbols,encoderPath,modelPath):
     encoderModel = generateLabelsEncoder(trainTargetSymbols)
 
     with open(encoderPath, 'wb') as file:
-        pickle.dump(encoderModel, file, -1)
+        pickle.dump(encoderModel, file, pickle.HIGHEST_PROTOCOL)
 
     labelTrainTarget = transformLabels(trainTargetSymbols, encoderModel)
 
@@ -141,7 +141,7 @@ def train_rf_model(trainSymbols,trainTargetSymbols,encoderPath,modelPath):
     # https://stackabuse.com/scikit-learn-save-and-restore-models/
     # pkl_filename = "pickle_rf.pkl"
     with open(modelPath, 'wb') as file:
-        pickle.dump(rf, file, -1)
+        pickle.dump(rf, file, pickle.HIGHEST_PROTOCOL)
     print("finish train random forest")
     return
 
