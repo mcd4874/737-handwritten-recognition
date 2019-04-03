@@ -1,28 +1,23 @@
-from sklearn.utils import resample
-from sklearn.preprocessing import MinMaxScaler
-from sklearn.neighbors import KDTree
+#
+# CSCI-737: Project 1
+# Authors: Eric Hartman and William Duong
+#
+
 from sklearn.metrics import confusion_matrix,classification_report
-from sklearn.preprocessing import LabelEncoder
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.ensemble import RandomForestClassifier
 from generateFeatureStack import getFeatures
 
 import numpy as np
-import matplotlib.pyplot as plt
-import math
-import xml.etree.ElementTree as ET
-import os
-import cv2
 import pickle
 import pandas as pd
 import csv
 import sys
 
-
+# Utility method to clean an input string
 def cleanString(string):
     elements = str(string).split("'")
     return elements[1];
 
+# Runs a test dataset through the given classifier producing prediction results
 def testClassifier(testSamplesFile, labelTestTarget, rf, encoderModel, uiStack):
     predict = rf.predict(testSamplesFile[:, 0:])
     combine = np.concatenate((predict, labelTestTarget), axis=0)
@@ -55,7 +50,7 @@ def testClassifier(testSamplesFile, labelTestTarget, rf, encoderModel, uiStack):
         print(classification_report(labelTestTarget, predict, target_names=labelTags))
     return
 
-
+# Wrapper around encoderModel's transform method
 def transformLabels(targetClasses,encoderModel):
     """
     This function will convert target classes labels into numeric vectors for one hot encoding
@@ -65,7 +60,7 @@ def transformLabels(targetClasses,encoderModel):
     """
     return encoderModel.transform(targetClasses)
 
-
+# Retrieves the top 10 predictions
 def get_list_indices_predict(testSamplesFile, classifier, encoderModel):
     resultList = []
 
@@ -86,6 +81,7 @@ def get_list_indices_predict(testSamplesFile, classifier, encoderModel):
         resultList.append(resultVector)
     return resultList
 
+# Tests the given model
 def test_model(testSymbols, labelTestTarget, stack, encoderPath, modelPath, outputFile):
     with open(encoderPath, 'rb') as file:
         encoderModel = pickle.load(file)

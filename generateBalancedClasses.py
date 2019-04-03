@@ -1,11 +1,14 @@
 #
+# CSCI-737: Project 1
+# Authors: Eric Hartman and William Duong
+#
+
+#
 # The following shell commands will generate the frequencies for the Real Symbols dataset
 #   cat iso_GT.txt | awk - F',' {' print $2 '} | sort | uniq - c | sort > classFrequencies.txt
 #
 from sklearn.utils import resample
 import numpy as np
-import matplotlib.pyplot as plt
-import math
 from generateFeatureStack import cacheUItoFilename
 
 # Helper function to return True if any overlapping UI is presented
@@ -32,6 +35,7 @@ def skipBadUI(ui):
         return True
     return False
 
+# Generates the 70%/30% train/test split
 def generateTrainTestSplit(sourceFile, trainFile, testFile, uiToFilename, testFileForEval):
     # Extract the path prefix
     elements = sourceFile.split('/')
@@ -91,6 +95,9 @@ def generateTrainTestSplit(sourceFile, trainFile, testFile, uiToFilename, testFi
 
     return
 
+# Utility method to upsample symbol classes to be balanced
+# We ended up not using this approach because the resulting datasets were approximately 10x larger
+# and slowed down training to a crawl.
 def generateBalancedClasses(sourceFile, outputFile):
     # Load the dictionary file
     data = np.genfromtxt(sourceFile, delimiter=',', dtype=str)
@@ -135,6 +142,7 @@ def generateBalancedClasses(sourceFile, outputFile):
     f.close()
     return
 
+# Combines two input files into a concatenated output file
 def generateCombination(file1, file2, output):
     data1 = np.genfromtxt(file1, delimiter=',', dtype=str)
     data2 = np.genfromtxt(file2, delimiter=',', dtype=str)

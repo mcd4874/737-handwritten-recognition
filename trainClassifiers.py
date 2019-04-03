@@ -3,23 +3,14 @@ Author: William Duong, Eric Hartman
 This file will extract image data from csv file to train KD model and random forest model
 """
 
-
-from sklearn.utils import resample
-from sklearn.preprocessing import MinMaxScaler
-from sklearn.neighbors import KDTree
-from sklearn.metrics import confusion_matrix,classification_report
 from sklearn.preprocessing import LabelEncoder
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.ensemble import RandomForestClassifier
 
 import numpy as np
-import matplotlib.pyplot as plt
-import math
-import xml.etree.ElementTree as ET
-import os
-import cv2
 import pickle
 
+# Stacks up the feature vectors for the samples
 def stackFeatures(stackFile, sampleListFile):
     """
     This function will extract image data from the stackFile and combine those data into
@@ -58,7 +49,7 @@ def stackFeatures(stackFile, sampleListFile):
     targetClasses = np.array(targetClasses, dtype=np.dtype('a16'))
     return stack,targetClasses
 
-
+# Constructs the label encoder
 def generateLabelsEncoder(targetClasses):
     """
     create label encoder model with target classes label
@@ -69,6 +60,7 @@ def generateLabelsEncoder(targetClasses):
     enc.fit(targetClasses)
     return enc
 
+# Wrapper around encoder model's transform method
 def transformLabels(targetClasses,encoderModel):
     """
     This function will convert target classes labels into numeric vectors for one hot encoding
@@ -78,22 +70,7 @@ def transformLabels(targetClasses,encoderModel):
     """
     return encoderModel.transform(targetClasses)
 
-
-def trainKDTreeClassifier(stack, targetClasses):
-    kdTree = KNeighborsClassifier(n_neighbors=1, algorithm='kd_tree')
-    # Train with the data skipping the 0th column containing the UI
-    kdTree.fit(stack[:, 1:], targetClasses)
-
-    return kdTree
-
-
-def trainRandomForestClassifier(stack, targetClasses, maxTrees, maxDepth):
-    rf = RandomForestClassifier(n_estimators=maxTrees, max_depth=maxDepth)
-    # Train with the data skipping the 0th column containing the UI
-    rf.fit(stack[:, 1:], targetClasses)
-    return rf
-
-
+# Trains the KD Tree classifier model
 def train_kd_model(trainSymbols,trainTargetSymbols,encoderPath,modelPath):
     """
     this function will train a KNN model with n=1 using kd tree algorithm
@@ -116,6 +93,7 @@ def train_kd_model(trainSymbols,trainTargetSymbols,encoderPath,modelPath):
     print("finish train kd tree")
     return
 
+# Trains the Random Forest classifier model
 def train_rf_model(trainSymbols,trainTargetSymbols,encoderPath,modelPath):
     """
     this function will train a random forest model
