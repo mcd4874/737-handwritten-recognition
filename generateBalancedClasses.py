@@ -8,6 +8,30 @@ import matplotlib.pyplot as plt
 import math
 from generateFeatureStack import cacheUItoFilename
 
+# Helper function to return True if any overlapping UI is presented
+def skipBadUI(ui):
+    if "101_alfonso_0" == ui:
+        return True
+    if "101_alfonso_1" == ui:
+        return True
+    if "101_alfonso_2" == ui:
+        return True
+    if "101_alfonso_3" == ui:
+        return True
+    if "101_alfonso_4" == ui:
+        return True
+    if "101_alfonso_5" == ui:
+        return True
+    if "101_alfonso_6" == ui:
+        return True
+    if "101_alfonso_7" == ui:
+        return True
+    if "101_alfonso_8" == ui:
+        return True
+    if "101_alfonso_9" == ui:
+        return True
+    return False
+
 def generateTrainTestSplit(sourceFile, trainFile, testFile, uiToFilename, testFileForEval):
     # Extract the path prefix
     elements = sourceFile.split('/')
@@ -42,16 +66,23 @@ def generateTrainTestSplit(sourceFile, trainFile, testFile, uiToFilename, testFi
 
         # Write Test samples (0, testCount)
         for j in range(0, testCount):
+            # Skip special set of 10 UIs that are in both symbol and junk datasets due to poor quality GT
+            if skipBadUI(symbolSamples[j][0]):
+                continue
+
             #fTest.write('' + symbolSamples[j][0] + ',' + symbolSamples[j][1] + '\n')
             print("key=", symbolSamples[j][0], ", filename=", uiToFilename[symbolSamples[j][0]])
-            fTest.write('' + uiToFilename[symbolSamples[j][0]] + ',' + symbolSamples[j][1] + '\n')
+            fTest.write('' + uiToFilename[symbolSamples[j][0]] + ',' + str(symbolSamples[j][1]).strip() + '\n')
 
             # Write out the "evalSymIsole.py" compatible test output file
-            fEval.write('' + symbolSamples[j][0] + ',' + symbolSamples[j][1] + '\n')
+            fEval.write('' + symbolSamples[j][0] + ',' + str(symbolSamples[j][1]).strip() + '\n')
 
         # Write Train samples (testCount, totalCount)
         for j in range(testCount, len(symbolSamples)):
-            fTrain.write('' + symbolSamples[j][0] + ',' + symbolSamples[j][1] + '\n')
+            # Skip special set of 10 UIs that are in both symbol and junk datasets due to poor quality GT
+            if skipBadUI(symbolSamples[j][0]):
+                continue
+            fTrain.write('' + symbolSamples[j][0] + ',' + str(symbolSamples[j][1]).strip() + '\n')
 
     # Close the output files
     fTest.close()
@@ -131,6 +162,7 @@ def main():
     # Combine symbol and junk test dataset
     generateCombination("./trainingSymbols/iso_GT_train.txt", "./trainingJunk/junk_GT_train.txt", "./trainingSymbols/combined_GT_train.txt")
     generateCombination("./trainingSymbols/iso_GT_test.txt", "./trainingJunk/junk_GT_test.txt", "./trainingSymbols/combined_GT_test.txt")
+    generateCombination("./trainingSymbols/iso_GT_test_eval.txt", "./trainingJunk/junk_GT_test_eval.txt", "./trainingSymbols/combined_GT_test_eval.txt")
 
     # Resample the real training symbols for train/test splits
     #generateBalancedClasses("./trainingSymbols/iso_GT_train.txt", "./trainingSymbols/iso_GT_train_resampled.txt")
