@@ -1,10 +1,12 @@
-from sklearn.preprocessing import MinMaxScaler
-import numpy as np
-import math
+#
+# datasplit.py
+#
+# Authors: Eric Hartman and William Duong
+#
+# Splits the dataset into train and test splits using a greedy algorithm
+#
+
 import xml.etree.ElementTree as ET
-import os
-import cv2
-import csv
 import sys
 
 # Extract the list of symbols from the given inkml file
@@ -13,7 +15,7 @@ def extractSymbolsFromFile(filename):
     symbols = []
 
     # Define our ParseError
-    ParseError = ET.ParseError;
+    ParseError = ET.ParseError
 
     try:
         # Parse inkml and get root
@@ -23,7 +25,7 @@ def extractSymbolsFromFile(filename):
         for node in tree.findall('.//{http://www.w3.org/2003/InkML}traceGroup/{http://www.w3.org/2003/InkML}traceGroup/{http://www.w3.org/2003/InkML}annotation'):
             symbols.append(node.text.strip())
 
-        #print("File: ", filename, ", symbols: ", symbols)
+        print("File: ", filename, ", symbols: ", symbols)
 
     except ParseError:
         print("ParseError on ", filename)
@@ -72,7 +74,7 @@ def calculateDistance(trainHistogram, testHistogram):
     ratioTotal = 0.0
     for ratio in ratios:
         ratioTotal += ratio
-    distance = float(ratioTotal) / float(len(ratios));
+    distance = float(ratioTotal) / float(len(ratios))
 
     return distance
 
@@ -89,7 +91,7 @@ def greedySplit(inputFile, trainFile, testFile):
     files = open(inputFile)
     for file in files:
         filename = file.strip()
-        print("Processing ", filename)
+        #print("Processing ", filename)
 
         # Add file to "next" possible histogram copies
         trainHistogramNext = addFileToHistogramCopy(trainHistogram, filename)
