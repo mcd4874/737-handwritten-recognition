@@ -3,11 +3,15 @@
 #
 # Authors: Eric Hartman and William Duong
 #
-# Splits the dataset into train and test splits using a greedy algorithm
+# Splits the dataset into train and test splits using a greedy algorithm that
+# first seeks to reduce errors in target mean, then seeks to reduce variance
+# around the target mean.
 #
 
 import xml.etree.ElementTree as ET
 import sys
+import random
+import numpy as np
 
 # Extract the list of symbols from the given inkml file
 def extractSymbolsFromFile(filename):
@@ -55,7 +59,7 @@ def addFileToHistogramCopy(histogram, filename):
     # Return the updated distribution (copy)
     return histogramNext
 
-# Calculates the ratio of symbol distributions between train vs (train and test)
+# Calculates the ratio (or mean) of symbol distributions between train vs (train and test)
 def calculateDistance(trainHistogram, testHistogram):
     ratios = []
 
@@ -78,6 +82,44 @@ def calculateDistance(trainHistogram, testHistogram):
 
     return distance
 
+# Calculates the variance of the ratio of symbol distributions between train vs (train and test)
+def calculateVariance(trainHistogram, testHistogram):
+    ratios = []
+
+    # Construct a union of the keys for both histograms
+    symbols = list( set(trainHistogram.keys()) | set(testHistogram.keys()))
+
+    # Iterate over all of the known symbols
+    for symbol in symbols:
+        # Calculate the train[symbol] / (train[symbol] + test[symbol]) ratio
+        ratio = float(trainHistogram.get(symbol, 0)) / float((trainHistogram.get(symbol, 0) + testHistogram.get(symbol, 0)))
+
+        # Append the ratio to our list
+        ratios.append(ratio)
+
+    # Calculate the varaince of our ratios
+    variance = np.var(ratios)
+
+    return variance
+
+# Utility method to print a report of the train and test split symbol distributions
+def showDistributionStatistics(trainHistogram, testHistogram):
+    # Construct a union of the keys for both histograms
+    symbols = list( set(trainHistogram.keys()) | set(testHistogram.keys()))
+
+    # Iterate over all of the known symbols
+    for symbol in symbols:
+        # Calculate the train[symbol] / (train[symbol] + test[symbol]) ratio
+        trainRatio = float(trainHistogram.get(symbol, 0)) / float((trainHistogram.get(symbol, 0) + testHistogram.get(symbol, 0)))
+
+        # Calculate the test[symbol] / (train[symbol] + test[symbol]) ratio
+        testRatio = float(testHistogram.get(symbol, 0)) / float((trainHistogram.get(symbol, 0) + testHistogram.get(symbol, 0)))
+
+        # Output summary details per symbol
+        print("symbol [", symbol, "]: train=", trainRatio, ", test=", testRatio, ", totalCount=", trainHistogram.get(symbol,0) + testHistogram.get(symbol,0))
+
+    return
+
 # Greedy Algorithm to split the train/test files
 def greedySplit(inputFile, trainFile, testFile):
     # Histograms for tracking distributions of symbols in train/test splits
@@ -88,7 +130,12 @@ def greedySplit(inputFile, trainFile, testFile):
     trainOutput = open(trainFile, "w+")
     testOutput = open(testFile, "w+")
 
-    files = open(inputFile)
+    # Extract filenames from input file
+    files = open(inputFile).readlines()
+
+    # Randomize the filenames
+    random.shuffle(files)
+
     for file in files:
         filename = file.strip()
         #print("Processing ", filename)
@@ -106,24 +153,42 @@ def greedySplit(inputFile, trainFile, testFile):
         trainNextError = abs(trainNextDistance - 0.70)
         testNextError = abs(testNextDistance - 0.70)
 
-        # Greedily choose winner as the one leading to lowest error
-        if trainNextError < testNextError:
-            # Add to Train
-            trainHistogram = trainHistogramNext
-            trainOutput.write("" + filename + "\n")
-            print("Distance = ", trainNextDistance)
+        # Determine if error is wide enough to use as primary factor...
+        if trainNextError > 0.01 or testNextError > 0.01:
+            # Greedily choose winner as the one leading to lowest error
+            if trainNextError < testNextError:
+                # Add to Train
+                trainHistogram = trainHistogramNext
+                trainOutput.write("" + filename + "\n")
+                print("Distance = ", trainNextDistance)
+            else:
+                # Add to Test
+                testHistogram = testHistogramNext
+                testOutput.write("" + filename + "\n")
+                print("Distance = ", testNextDistance)
         else:
-            # Add to Test
-            testHistogram = testHistogramNext
-            testOutput.write("" + filename + "\n")
-            print("Distance = ", testNextDistance)
+            # Choose split based on minimizing variance...
+            trainNextVariance = calculateVariance(trainHistogramNext, testHistogram)
+            testNextVariance = calculateVariance(trainHistogram, testHistogramNext)
+
+            # Greedily choose winner as the one leading to lowest variance
+            if trainNextVariance < testNextVariance:
+                # Add to Train
+                trainHistogram = trainHistogramNext
+                trainOutput.write("" + filename + "\n")
+                print("Variance = ", trainNextVariance)
+            else:
+                # Add to Test
+                testHistogram = testHistogramNext
+                testOutput.write("" + filename + "\n")
+                print("Variance = ", testNextVariance)
 
     # Close the output files
     testOutput.close()
     trainOutput.close()
 
-    # Close the input file
-    files.close()
+    # Output the symbol distribution statistics
+    showDistributionStatistics(trainHistogram, testHistogram)
 
     return
 
