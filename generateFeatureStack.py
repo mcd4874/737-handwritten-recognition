@@ -1,12 +1,13 @@
-from sklearn.utils import resample
+#
+# CSCI-737: Project 1
+# Authors: Eric Hartman and William Duong
+#
 from sklearn.preprocessing import MinMaxScaler
 import numpy as np
-import matplotlib.pyplot as plt
 import math
 import xml.etree.ElementTree as ET
 import os
 import cv2
-
 
 # Function to normalize the (x,y) coordinates contained within the given dictionary according to
 #  width and heights provided.  This normalization is performed on a per-sample basis.
@@ -67,6 +68,7 @@ def parseStrokesInto3DArray(strokes):
 
     return strokesArray
 
+# Loads the sample data from the given filename into the provided dictionary
 def loadSampleIntoDictionary(idToUILookup, dictionary, filename):
     # print("filename: ", filename)
     tree = ET.parse(filename)
@@ -123,69 +125,7 @@ def cacheUItoFilename(uiToFilename, directoryPath):
 
     return
 
-def loadSamplesIntoDictionary(idToUILookup, dictionary, directoryPath, limit):
-    counter = 0
-
-    # Iterate over all of the files
-    fileList = os.listdir(directoryPath)
-    for filename in fileList:
-        if "inkml" in filename:
-            #print("filename: ", filename)
-            tree = ET.parse(directoryPath + "/" + filename)
-            root = tree.getroot()
-            id=None
-            strokes=[]
-
-            # extract annotation type
-            for child in root.iter():
-                #print("child.tag: ", child.tag, ",  child.attrib: ", child.attrib);
-                if child.tag == '{http://www.w3.org/2003/InkML}annotation' and child.attrib['type'] == 'UI':
-                    # Retrieve the unique identifier for this symbol
-                    UI=child.text
-
-                    # Take the last _'th split as the unique identifier for this sample
-                    elements = UI.split("_")
-                    id = elements[len(elements)-1]
-                    print("filename = ", filename, ", value = ", child.text, ", type = ", child.attrib['type'])
-
-                    # Add the id to UI to our lookup dictionary
-                    idToUILookup[id] = UI;
-
-                if child.tag == '{http://www.w3.org/2003/InkML}trace':
-                    # Retrieve the stroke(s) for this symbol
-                    #print("value = ", child.text)
-                    strokes.append(child.text)
-
-            # Convert strokes into 3D numpy array: [stroke][x][y]
-            strokes3d = parseStrokesInto3DArray(strokes)
-
-            # Add symbol to our dictionary
-            dictionary[id] = strokes3d
-            counter += 1
-
-            # Premature break for testing purposes
-            if limit > 0 and counter >= limit:
-                break
-            # break
-
-    return
-
-def generateNoConnectImagesOLD(dictionary, path, w, h):
-    size = (h+1, w+1, 1)
-    for id in dictionary:
-        print("NoConnect: Processing image for ", id)
-        img = np.full(size, 255, np.uint8)
-
-        # Process each point
-        for strokeCoordinate in dictionary[id]:
-            # Stroke, X, Y into img[Y][X]
-            #print("strokeCoordinate=", strokeCoordinate)
-            img[math.floor(strokeCoordinate[2])][math.floor(strokeCoordinate[1])] = 0
-        filename = "" + id + ".png"
-        cv2.imwrite(path + "/" + filename, img)
-
-    return
-
+# Generates sample images with dots for the stroke coordinates
 def generateNoConnectImages(dictionary, imageDictionary, w, h):
     size = (h+1, w+1, 1)
     keys = list(dictionary)
@@ -204,6 +144,7 @@ def generateNoConnectImages(dictionary, imageDictionary, w, h):
         imageDictionary[id] = img.ravel()
     return
 
+# Generates sample images with lines between consecutive stroke coordinates
 def generateConnectedImages(dictionary, imageDictionary, w, h, thickness):
     size = (h+1, w+1, 1)
 
@@ -296,6 +237,7 @@ def generateFeatureStack(idToUILookup, dictionary):
 
     return uiStack, stack
 
+# Normalizes the angles to the nearest sector
 def orientationNormalization(stack, sector):
     normalizedStack = []
     for features in stack:
@@ -312,6 +254,7 @@ def orientationNormalization(stack, sector):
 
     return normalizedStack
 
+# Reduces sequences of duplicate angles to just one instance of the angle
 def deduplicationNormalization(stack):
     normalizedStack = []
     for features in stack:
@@ -338,6 +281,7 @@ def deduplicationNormalization(stack):
 
     return normalizedStack
 
+# Saves the output in CSV form for debugging purposes
 def saveCSV(uiStack, stack, filename):
     file = open(filename, "w+")
 
@@ -357,7 +301,7 @@ def saveCSV(uiStack, stack, filename):
 
     file.close()
 
-
+# Normalizes the number of angles to the given featureCount
 def featureCountNormalization(stack, featureCount):
     newStack = []
 
@@ -371,6 +315,7 @@ def featureCountNormalization(stack, featureCount):
 
     return newStack
 
+# Appends the orientation angle histogram bins to the feature vectors
 def appendBinFeatures(stack, binCount):
     newStack = []
 
@@ -404,6 +349,7 @@ def appendBinFeatures(stack, binCount):
 
     return newStack
 
+# Appends the unraveled image pixel values to the feature vectors
 def appendImageFeatures(stack, imageDictionary):
     newStack = []
 
@@ -424,59 +370,8 @@ def appendImageFeatures(stack, imageDictionary):
 
     return newStack
 
-def mainOLD():
-    limit = 0
-    w = 20
-    h = 20
-    thickness = 4
-    sector = 45
-    binCount = 8
-    featureCount = 30
-
-    # Initialize the dictionary
-    symbolsDictionary = dict()
-    junkDictionary = dict()
-    symbolsImageDictionary = dict()
-    junkImageDictionary = dict()
-    symbolIdToUILookup = dict()
-    junkIdToUILookup = dict();
-
-    # Load Symbols and Junk samples into the common dictionary, indexed by UI "unique identifier?"
-    loadSamplesIntoDictionary(symbolIdToUILookup, symbolsDictionary, "./trainingSymbols/", limit)
-    loadSamplesIntoDictionary(junkIdToUILookup, junkDictionary, "./trainingJunk/", limit)
-
-    # Perform normalization to all samples in our dictionary
-    normalizeSamples(symbolsDictionary, w, h)
-    normalizeSamples(junkDictionary, w, h)
-
-    # Create "no-connect" images
-    #generateNoConnectImages(symbolsDictionary, symbolsImageDictionary, w, h);
-    #generateNoConnectImages(junkDictionary, junkImageDictionary, w, h);
-
-    # Create "connected" images
-    generateConnectedImages(symbolsDictionary, symbolsImageDictionary, w, h, thickness)
-    generateConnectedImages(junkDictionary, junkImageDictionary, w, h, thickness)
-
-    symbolUIStack, symbolStack = generateFeatureStack(symbolIdToUILookup, symbolsDictionary)
-    symbolStack = orientationNormalization(symbolStack, sector)
-    symbolStack = deduplicationNormalization(symbolStack)
-    symbolStack = featureCountNormalization(symbolStack, featureCount)
-    symbolStack = appendBinFeatures(symbolStack, binCount)
-    symbolStack = appendImageFeatures(symbolStack, symbolsImageDictionary)
-
-    junkUIStack, junkStack = generateFeatureStack(junkIdToUILookup, junkDictionary)
-    junkStack = orientationNormalization(junkStack, sector)
-    junkStack = deduplicationNormalization(junkStack)
-    junkStack = featureCountNormalization(junkStack, featureCount)
-    junkStack = appendBinFeatures(junkStack, binCount)
-    junkStack = appendImageFeatures(junkStack, junkImageDictionary)
-
-    #print("stack=", stack)
-
-    saveCSV(symbolUIStack, symbolStack, "./symbolStack.csv")
-    saveCSV(junkUIStack, junkStack, "./junkStack.csv")
-    return
-
+# Utility method called by testClassifiers_v2 to retrieve all of the features for the
+# samples denoted in the given input file
 def getFeatures(inputFile):
     w = 20
     h = 20
@@ -524,12 +419,10 @@ def getFeatures(inputFile):
     symbolStack = deduplicationNormalization(symbolStack)
     symbolStack = featureCountNormalization(symbolStack, featureCount)
     symbolStack = appendBinFeatures(symbolStack, binCount)
+    print("stack shape after append bin features=", len(symbolStack[0]))
     symbolStack = appendImageFeatures(symbolStack, symbolsImageDictionary)
+    print("stack shape after append image features=", len(symbolStack[0]))
 
-    #print("stack=", stack)
-
-    saveCSV(symbolUIStack, symbolStack, "./symbolStack.csv")
-
-    # Convert symbolStack to numpy array
+    #saveCSV(symbolUIStack, symbolStack, "./symbolStack.csv")
 
     return symbolUIStack, np.array(symbolStack), targetStack;

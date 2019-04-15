@@ -1,7 +1,17 @@
-from sklearn.utils import resample
+#
+# CSCI-737: Project 1
+# Authors: Eric Hartman and William Duong
+#
+# There is some repetition in function implementations with generateFeatureStack.py.
+# The reason for this is the indexing into the provided dictionaries in these functions
+# is done differently for generateNormalizedImages.py versus generateFeatureStack.py.
+#
+# The differences in indexing into dictionaries is because the "testClassifiers_v2.py" must take as input
+# a file of filenames.  Whereas, trainClassifiers.py is able to use the UIs directly from the ground truth subsets.
+# It is a little convoluted, yes.
+
 from sklearn.preprocessing import MinMaxScaler
 import numpy as np
-import matplotlib.pyplot as plt
 import math
 import xml.etree.ElementTree as ET
 import os
@@ -67,6 +77,7 @@ def parseStrokesInto3DArray(strokes):
 
     return strokesArray
 
+# Loads the samples data from the given path into the provided dictionary
 def loadSamplesIntoDictionary(idToUILookup, dictionary, directoryPath, limit):
     counter = 0
 
@@ -114,22 +125,7 @@ def loadSamplesIntoDictionary(idToUILookup, dictionary, directoryPath, limit):
 
     return
 
-def generateNoConnectImagesOLD(dictionary, path, w, h):
-    size = (h+1, w+1, 1)
-    for id in dictionary:
-        print("NoConnect: Processing image for ", id)
-        img = np.full(size, 255, np.uint8)
-
-        # Process each point
-        for strokeCoordinate in dictionary[id]:
-            # Stroke, X, Y into img[Y][X]
-            #print("strokeCoordinate=", strokeCoordinate)
-            img[math.floor(strokeCoordinate[2])][math.floor(strokeCoordinate[1])] = 0
-        filename = "" + id + ".png"
-        cv2.imwrite(path + "/" + filename, img)
-
-    return
-
+# Generates sample images with dots for the stroke coordinates
 def generateNoConnectImages(dictionary, imageDictionary, w, h):
     size = (h+1, w+1, 1)
     for id in dictionary:
@@ -146,6 +142,7 @@ def generateNoConnectImages(dictionary, imageDictionary, w, h):
         imageDictionary[id] = img.ravel()
     return
 
+# Generates sample images with lines between consecutive stroke coordinates
 def generateConnectedImages(dictionary, imageDictionary, w, h, thickness):
     size = (h+1, w+1, 1)
 
@@ -234,6 +231,7 @@ def generateFeatureStack(idToUILookup, dictionary):
 
     return uiStack, stack
 
+# Normalizes the angles to the nearest sector
 def orientationNormalization(stack, sector):
     normalizedStack = []
     for features in stack:
@@ -250,6 +248,7 @@ def orientationNormalization(stack, sector):
 
     return normalizedStack
 
+# Reduces sequences of duplicate angles to just one instance of the angle
 def deduplicationNormalization(stack):
     normalizedStack = []
     for features in stack:
@@ -276,6 +275,7 @@ def deduplicationNormalization(stack):
 
     return normalizedStack
 
+# Saves the output in CSV form for later use by trainClassifiers.py
 def saveCSV(uiStack, stack, filename):
     file = open(filename, "w+")
 
@@ -295,7 +295,7 @@ def saveCSV(uiStack, stack, filename):
 
     file.close()
 
-
+# Normalizes the number of angles to the given featureCount
 def featureCountNormalization(stack, featureCount):
     newStack = []
 
@@ -309,6 +309,7 @@ def featureCountNormalization(stack, featureCount):
 
     return newStack
 
+# Appends the orientation angle histogram bins to the feature vectors
 def appendBinFeatures(stack, binCount):
     newStack = []
 
@@ -342,6 +343,7 @@ def appendBinFeatures(stack, binCount):
 
     return newStack
 
+# Appends the unraveled image pixel values to the feature vectors
 def appendImageFeatures(stack, imageDictionary):
     newStack = []
 
