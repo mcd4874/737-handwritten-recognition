@@ -147,17 +147,27 @@ def main():
     rfModelBothPath = "pickle_both_rf.pkl"
     kdModelBothPath = "pickle_both_kd.pkl"
 
+    junkPath = './trainingJunk/junk_GT_test.txt'
+    # ./ trainingSymbols / iso_GT_test.txt
     # Generate the feature stack based upon the inkml files in the inputFile
     uiStack, featureStack, targetStack = getFeatures(inputFile)
+    uiStackJ, featureStackJ, targetStackJ = getFeatures(junkPath)
+
+    trainJunkSymbols = np.concatenate((featureStack, featureStackJ), axis=0)
+    targetJunkSymbols = np.concatenate((targetStack, targetStackJ), axis=0)
+    uicombine = np.concatenate((uiStack, uiStackJ), axis=0)
+
 
     if "randomForestSymbols" in classifierIdentifier:
         test_model(featureStack, targetStack, uiStack, encoderPath, rfModelPath, outputFile)
     if "randomForestCombined" in classifierIdentifier:
-        test_model(featureStack, targetStack, uiStack, encoderBothPath, rfModelBothPath, outputFile)
+        # test_model(featureStack, targetStack, uiStack, encoderBothPath, rfModelBothPath, outputFile)
+        test_model(trainJunkSymbols, targetJunkSymbols, uicombine, encoderBothPath, rfModelBothPath, outputFile)
     if "kdtreeSymbols" in classifierIdentifier:
         test_model(featureStack, targetStack, uiStack, encoderPath, kdModelPath, outputFile)
     if "kdtreeCombined" in classifierIdentifier:
-        test_model(featureStack, targetStack, uiStack, encoderBothPath, kdModelBothPath, outputFile)
+        # test_model(featureStack, targetStack, uiStack, encoderBothPath, kdModelBothPath, outputFile)
+        test_model(trainJunkSymbols, targetJunkSymbols, uicombine, encoderBothPath, kdModelBothPath, outputFile)
 
     return
 
