@@ -426,3 +426,5 @@ def getFeatures(inputFile):
     #saveCSV(symbolUIStack, symbolStack, "./symbolStack.csv")
 
     return symbolUIStack, np.array(symbolStack), targetStack;
+
+getFeatures("testInput")
