@@ -152,7 +152,7 @@ def generateConnectedImages(dictionary, imageDictionary, w, h, thickness):
     for i in range(0,len(dictionary)):
         id = keys[i]
 
-        print("Connected: Processing image for ", id)
+        #print("Connected: Processing image for ", id)
         img = np.full(size, 255, np.uint8)
 
         # Process each point
@@ -196,7 +196,7 @@ def generateFeatureStack(idToUILookup, dictionary):
     keys = list(dictionary)
     for i in range(0,len(dictionary)):
         id = keys[i]
-        print("Processing id=", id)
+        #print("Processing id=", id)
         features = []
 
         # Add the UI to the uiStack
@@ -232,7 +232,7 @@ def generateFeatureStack(idToUILookup, dictionary):
             # Remember this as last coordinate
             lastCoordinate = strokeCoordinate
 
-        print("features=", features)
+        #print("features=", features)
         stack.append(features)
 
     return uiStack, stack
@@ -250,7 +250,7 @@ def orientationNormalization(stack, sector):
             #print("feature=", feature, ", approximateAngle=", approximateAngle)
             newFeature.append(approximateAngle)
         normalizedStack.append(newFeature)
-        print("orientation normalized feature=",newFeature)
+        #print("orientation normalized feature=",newFeature)
 
     return normalizedStack
 
@@ -277,7 +277,7 @@ def deduplicationNormalization(stack):
             lastFeature = feature
 
         normalizedStack.append(newFeature)
-        print("deduplicate feature=",newFeature)
+        #print("deduplicate feature=",newFeature)
 
     return normalizedStack
 
@@ -343,8 +343,8 @@ def appendBinFeatures(stack, binCount):
             binFeatures[chosenBin] += 1.0
 
         newFeatures.extend(binFeatures)
-        print("bins: ", binFeatures)
-        print("New features with bins: ", newFeatures)
+        #print("bins: ", binFeatures)
+        #print("New features with bins: ", newFeatures)
         newStack.append(newFeatures)
 
     return newStack
@@ -356,7 +356,7 @@ def appendImageFeatures(stack, imageDictionary):
     keys = list(imageDictionary)
     for i in range(len(stack)):
         id = keys[i]
-        print("Appending image features for id=", id)
+        #print("Appending image features for id=", id)
         features = stack[i]
         newFeatures = features.copy()
 
@@ -419,9 +419,62 @@ def getFeatures(inputFile):
     symbolStack = deduplicationNormalization(symbolStack)
     symbolStack = featureCountNormalization(symbolStack, featureCount)
     symbolStack = appendBinFeatures(symbolStack, binCount)
-    print("stack shape after append bin features=", len(symbolStack[0]))
+    #print("stack shape after append bin features=", len(symbolStack[0]))
     symbolStack = appendImageFeatures(symbolStack, symbolsImageDictionary)
-    print("stack shape after append image features=", len(symbolStack[0]))
+    #print("stack shape after append image features=", len(symbolStack[0]))
+
+    #saveCSV(symbolUIStack, symbolStack, "./symbolStack.csv")
+
+    return symbolUIStack, np.array(symbolStack), targetStack;
+
+# Utility method called by segmenter to retrieve all of the features for the
+# given subset of strokes provided via subsetIdentifier and strokes
+def getFeaturesForStrokes(subsetIdentifier, strokes):
+    w = 20
+    h = 20
+    thickness = 4
+    sector = 45
+    binCount = 8
+    featureCount = 30
+
+    # Initialize the lists
+    symbolsDictionary = dict()
+    symbolsImageDictionary = dict()
+    symbolIdToUILookup = dict()
+
+    # Construct the target stack (if its available)
+    targetStack = []
+
+    # Load sample into dictionary:
+    #  Instead of parsing the XML file, do the basic
+    #  activities that were done in loadSampleIntoDictionary()
+
+    # Trivial use of symbolsIdToUILookup
+    symbolIdToUILookup[0] = subsetIdentifier
+
+    # Convert strokes into 3D numpy array: [stroke][x][y]
+    strokes3d = parseStrokesInto3DArray(strokes)
+
+    # Add symbol to our dictionary
+    symbolsDictionary[subsetIdentifier] = strokes3d
+
+    # Perform normalization to all samples in our dictionary
+    normalizeSamples(symbolsDictionary, w, h)
+
+    # Create "no-connect" images
+    #generateNoConnectImages(symbolsDictionary, symbolsImageDictionary, w, h);
+
+    # Create "connected" images
+    generateConnectedImages(symbolsDictionary, symbolsImageDictionary, w, h, thickness)
+
+    symbolUIStack, symbolStack = generateFeatureStack(symbolIdToUILookup, symbolsDictionary)
+    symbolStack = orientationNormalization(symbolStack, sector)
+    symbolStack = deduplicationNormalization(symbolStack)
+    symbolStack = featureCountNormalization(symbolStack, featureCount)
+    symbolStack = appendBinFeatures(symbolStack, binCount)
+    #print("stack shape after append bin features=", len(symbolStack[0]))
+    symbolStack = appendImageFeatures(symbolStack, symbolsImageDictionary)
+    #print("stack shape after append image features=", len(symbolStack[0]))
 
     #saveCSV(symbolUIStack, symbolStack, "./symbolStack.csv")
 

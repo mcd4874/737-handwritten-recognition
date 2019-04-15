@@ -65,6 +65,7 @@ def get_list_indices_predict(testSamplesFile, classifier, encoderModel):
     resultList = []
 
     predict_probs = classifier.predict_proba(testSamplesFile[:, 0:])
+    #print("Highest probability=", np.sort(predict_probs[0])[len(predict_probs[0])-1])
 
     sort_predict_probs_indices = predict_probs.argsort(axis = 1)[:,-10:]
 
@@ -79,6 +80,8 @@ def get_list_indices_predict(testSamplesFile, classifier, encoderModel):
         # Reverese the results so it is in decreasing accuracy order...
         resultVector.reverse()
         resultList.append(resultVector)
+
+    print("Prediction symbol=", resultVector[0], ", probability=", np.sort(predict_probs[0])[len(predict_probs[0])-1])
     return resultList
 
 # Tests the given model
@@ -109,6 +112,52 @@ def test_model(testSymbols, labelTestTarget, stack, encoderPath, modelPath, outp
     r = pd.concat([df1, df2], axis=1)
     r.to_csv(outputFile, index=False, header=False, encoding="utf-8", quoting=csv.QUOTE_NONE)
 
+def classifyStrokeSubset(featureStack, rf, encoderModel):
+    predict_probs = rf.predict_proba(featureStack[:, 0:])
+    #print("Highest probability=", np.sort(predict_probs[0])[len(predict_probs[0])-1])
+
+    sort_predict_probs_indices = predict_probs.argsort(axis = 1)[:,-10:]
+
+    result = np.chararray(sort_predict_probs_indices.shape, itemsize=20)
+    for i in range(result.shape[0]):
+        resultVector = []
+        for j in range(result.shape[1]):
+            result[i][j] = encoderModel.classes_[sort_predict_probs_indices[i][j]]
+            resultVector.append(cleanString(result[i][j]))
+        result[i] = result[i][::-1]
+
+        # Reverese the results so it is in decreasing accuracy order...
+        resultVector.reverse()
+
+    predictedSymbol = resultVector[0]
+    probability = np.sort(predict_probs[0])[len(predict_probs[0])-1]
+    #print("Prediction symbol=", predictedSymbol, ", probability=", probability)
+
+    #list_test_best_label_predict = get_list_indices_predict(featureStack, rf, encoderModel)
+    #df1 = pd.DataFrame(uiStack)
+    #df2 = pd.DataFrame(list_test_best_label_predict)
+    #r = pd.concat([df1, df2], axis=1)
+    #r.to_csv(outputFile, index=False, header=False, encoding="utf-8", quoting=csv.QUOTE_NONE)
+    #return list_test_best_label_predict
+
+    return predictedSymbol, probability
+
+# Utility method to return the loaded models for the classifier, this is a "do once" activity
+def loadModels(encoderPath, modelPath):
+    with open(encoderPath, 'rb') as file:
+        encoderModel = pickle.load(file)
+    print("Finished loading encoder.")
+    print(encoderModel.classes_)
+
+    # Load the RandomForestClassifier from our pickle
+    # https://stackabuse.com/scikit-learn-save-and-restore-models/
+    print("Loading model from pickle...")
+    with open(modelPath, 'rb') as file:
+        rf = pickle.load(file)
+    print("Finished loading.")
+
+    # Return back the loaded models and supporting structures
+    return rf, encoderModel
 
 def main():
     # Print usage...
