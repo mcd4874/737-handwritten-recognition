@@ -199,11 +199,21 @@ def getUniquePartitionsOfStrokes(strokeIdToStroke, maxDistance, maxStrokesPerSym
     # Initialize uniquePartitions
     uniquePartitionsByStrokeIds = []
 
+    # Initialize single stroke mappings for use later
+    strokeIdToSubsetId = dict()
+    strokeIdToSubset = dict()
+
     # Generate unique partitions by stroke ids (with minimum size of 1 stroke)
     for L in range(1, min(len(strokeIds) + 1, maxStrokesPerSymbol)):
         for subset in itertools.combinations(strokeIds, L):
             #print("subset=", subset)
             uniquePartitionsByStrokeIds.append(subset)
+
+            # Remember the single-stroke mappings to subsetIdentifiers and subsets
+            # These will be used in createSegmentationSets
+            if L == 1:
+                strokeIdToSubsetId[subset[0]] = len(uniquePartitionsByStrokeIds) - 1
+                strokeIdToSubset[subset[0]] = subset
 
     # Calculate the sum distance from centroid for each subset
     optimizedUniquePartitionsByStrokeIds = []
@@ -216,7 +226,7 @@ def getUniquePartitionsOfStrokes(strokeIdToStroke, maxDistance, maxStrokesPerSym
     print("Before optimiztion: Number of partitions =", len(uniquePartitionsByStrokeIds))
     print("After optimiztion:  Number of partitions =", len(optimizedUniquePartitionsByStrokeIds))
 
-    return optimizedUniquePartitionsByStrokeIds
+    return optimizedUniquePartitionsByStrokeIds, strokeIdToSubsetId, strokeIdToSubset
 
 # Method to check that the given segmentation is eactly a complete segmentation
 #  Meaning, reject segmentations that include the same stroke more than once
@@ -247,7 +257,8 @@ def checkForStrokeCompleteSegmentation(segmentation, strokeIdToStroke, subsetIdT
     return True
 
 # Method to use the predicted symbols and probabilities to generate possible segmentation sets
-def createSegmentationSets(strokeIdToStroke, uniquePartitionsByStrokeIds, subsetIdToPredictedSymbol, subsetIdToProbability, subsetIdToPredictedSymbolValid, subsetIdToProbabilityValid):
+def createSegmentationSets(strokeIdToStroke, uniquePartitionsByStrokeIds, subsetIdToPredictedSymbol, subsetIdToProbability, subsetIdToPredictedSymbolValid,
+                           subsetIdToProbabilityValid, strokeIdToSubsetId, strokeIdToSubset):
     # First, let's filter down the uniquePartitionsByStrokesIds by eliminating all partitions that result in "Junk"
     subsetIdToSubset = dict()
     for subsetIdentifier in range(0, len(uniquePartitionsByStrokeIds)):
@@ -267,9 +278,11 @@ def createSegmentationSets(strokeIdToStroke, uniquePartitionsByStrokeIds, subset
 
     # Re-classify these remainindStrokeIds using the valid symbols classifier
     for remainingStrokeId in remainingStrokeIds:
-        subset = []
-        subset.append(remainingStrokeId)
-        subsetIdToSubset["remainder_" + remainingStrokeId] = subset
+        subset = strokeIdToSubset[remainingStrokeId]
+        subsetIdentifier = strokeIdToSubsetId[remainingStrokeId]
+        #subset.append(remainingStrokeId)
+        #subsetIdToSubset["remainder_" + remainingStrokeId] = subset
+        subsetIdToSubset[subsetIdentifier] = subset
 
     # Construct the combinations of the subsetIds such that maximum strokes are included in each segmentation and there are no duplicates of strokeIds in the segmentation
     # Basically, construct the combinations of subsetIds from 1 to len(subsetIds
@@ -282,7 +295,51 @@ def createSegmentationSets(strokeIdToStroke, uniquePartitionsByStrokeIds, subset
                 print("segmentation=", segmentation)
                 segmentationSets.append(segmentation)
 
-    return segmentationSets
+    return segmentationSets, subsetIdToSubset
+
+# Method to select the best segmentation among those that are available
+def chooseBestSegmentation(segmentationSets, subsetIdToProbability):
+    # Return the best segmentation
+
+    # TO-DO: For now, just return the first segmentation
+    return segmentationSets[0]
+
+# Method to create a label graph (.lg) output file for the given segmentation
+def generateLabelGraphOutputFile(filename, segmentation, subsetIdToPredictedSymbol, subsetIdToPredictedSymbolValid, subsetIdToSubset):
+    # Calculate filename prefix
+    prefix = filename.split(".inkml")[0]
+
+    # Output filename
+    outputFilename = prefix + ".lg"
+    print("outputFilename=", outputFilename)
+
+    outputFile = open(outputFilename, "w+")
+
+    # Use dictionary as symbol counter
+    symbolToCount = dict()
+
+    # Iterate over the subsets in the segmentation
+    for subsetIdentifier in segmentation:
+        # Lookup the predicted symbol...
+        symbol = subsetIdToPredictedSymbol[subsetIdentifier]
+        if symbol == "junk":
+            symbol = subsetIdToPredictedSymbolValid[subsetIdentifier]
+
+        # Construct a unique symbol identifier with pattern <symbol>_<counter>
+        count = symbolToCount.get(symbol, 0)
+        count += 1
+        symbolToCount[symbol] = count
+        symbolUI = "" + symbol + "_" + str(count)
+
+        # Write the output...
+        outputFile.write("O, " + symbolUI + ", " + symbol + ", 1.0")
+        for strokeId in subsetIdToSubset[subsetIdentifier]:
+            outputFile.write(", " + strokeId)
+        outputFile.write("\n")
+
+    outputFile.close()
+
+    return
 
 # Segments the given input file, producing an .lg file as output
 def segment(fileList, mode):
@@ -309,7 +366,7 @@ def segment(fileList, mode):
         strokeIdToStroke, gt_strokeIdToSymbolId, gt_symbolIdToSymbol = extractStrokes(filename.strip(), mode)
 
         # Calculates unique partitions of strokes
-        uniquePartitionsByStrokeIds = getUniquePartitionsOfStrokes(strokeIdToStroke, maxDistance, maxStrokesPerSymbol, maxWidth, maxHeight)
+        uniquePartitionsByStrokeIds, strokeIdToSubsetId, strokeIdToSubset = getUniquePartitionsOfStrokes(strokeIdToStroke, maxDistance, maxStrokesPerSymbol, maxWidth, maxHeight)
 
         # Passes unique partitions of strokes to classifier to get symbols and probabilities, remembering them
         for subsetIdentifier in range(0, len(uniquePartitionsByStrokeIds)):
@@ -334,12 +391,15 @@ def segment(fileList, mode):
             subsetIdToProbabilityValid[subsetIdentifier] = probability
 
         # Creates sets of partitions of strokes
-        segmentationSets = createSegmentationSets(strokeIdToStroke, uniquePartitionsByStrokeIds, subsetIdToPredictedSymbol, subsetIdToProbability, subsetIdToPredictedSymbolValid, subsetIdToProbabilityValid)
+        segmentationSets, subsetIdToSubset = createSegmentationSets(strokeIdToStroke, uniquePartitionsByStrokeIds, subsetIdToPredictedSymbol, subsetIdToProbability, subsetIdToPredictedSymbolValid, subsetIdToProbabilityValid,
+                                                  strokeIdToSubsetId, strokeIdToSubset)
 
         # Chooses highest probability segmentation
-        #segmentation = chooseBestSegmentation(segmentationSets, subsetIdToProbability)
+        segmentation = chooseBestSegmentation(segmentationSets, subsetIdToProbability)
 
         # Generates .lg output file using symbols and stroke ids
+        generateLabelGraphOutputFile(filename, segmentation, subsetIdToPredictedSymbol, subsetIdToPredictedSymbolValid, subsetIdToSubset)
+
     return
 
 # Main entry point for the program
