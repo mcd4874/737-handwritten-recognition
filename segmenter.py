@@ -162,11 +162,8 @@ def calculateCentroidsByStrokeId(strokeIdToStroke, maxWidth, maxHeight):
 
     return strokeIdToCentroid
 
-# Returns the total distance from the centroid of the subset to every member of the subset
-# Something like a "star distance"
-def calculateSumOfDistancesToCentroid(subset, strokeIdToCentroid):
-    distance = 0.0
-
+# Helper method to calculate the centroid of a subset of strokes
+def calculateCentroidOfSubset(subset, strokeIdToCentroid):
     # Calculate the centroid of the subset
     x = 0.0
     y = 0.0
@@ -175,7 +172,16 @@ def calculateSumOfDistancesToCentroid(subset, strokeIdToCentroid):
         x += strokeCentroid[0]
         y += strokeCentroid[1]
 
-    centroidOfSubset = [float(x)/float(len(subset)), float(y)/float(len(subset))]
+    centroidOfSubset = [float(x) / float(len(subset)), float(y) / float(len(subset))]
+    return centroidOfSubset
+
+# Returns the total distance from the centroid of the subset to every member of the subset
+# Something like a "star distance"
+def calculateSumOfDistancesToCentroid(subset, strokeIdToCentroid):
+    distance = 0.0
+
+    # Calculate the centroid of the subset
+    centroidOfSubset = calculateCentroidOfSubset(subset, strokeIdToCentroid)
 
     # Calculate the total distance from the centroidOfSubset to each centroid
     for strokeId in subset:
@@ -185,6 +191,26 @@ def calculateSumOfDistancesToCentroid(subset, strokeIdToCentroid):
         distance += math.sqrt(math.pow(centroidOfSubset[0] - centroid[0], 2) + math.pow(centroidOfSubset[1] - centroid[1], 2))
 
     return distance
+
+# Calculates the maximum distance of any stroke centroid to the subset's centroid
+def calculateMaxDistanceToCentroid(subset, strokeIdToCentroid):
+    maxDistance = 0.0
+
+    # Calculate the centroid of the subset
+    centroidOfSubset = calculateCentroidOfSubset(subset, strokeIdToCentroid)
+
+    # Calculate the distance from the centroidOfSubset to furthest centroid
+    for strokeId in subset:
+        centroid = strokeIdToCentroid[strokeId]
+
+        # Generate the Euclidean distances from the subset centroid to each stroke's centroid
+        distance = math.sqrt(math.pow(centroidOfSubset[0] - centroid[0], 2) + math.pow(centroidOfSubset[1] - centroid[1], 2))
+
+        # Check if this is max so far
+        if distance > maxDistance:
+            maxDistance = distance
+
+    return maxDistance
 
 # Returns the list of unique partitions of stroke ids and list of unique partitions of strokes
 # restricted by the sum of all distances being less than or equal to the given maxDistance parameter.
@@ -219,12 +245,13 @@ def getUniquePartitionsOfStrokes(strokeIdToStroke, maxDistance, maxStrokesPerSym
     optimizedUniquePartitionsByStrokeIds = []
     for subset in uniquePartitionsByStrokeIds:
         #print("Processing subset=", subset)
-        distance = calculateSumOfDistancesToCentroid(subset, strokeIdToCentroid)
+        #distance = calculateSumOfDistancesToCentroid(subset, strokeIdToCentroid)
+        distance = calculateMaxDistanceToCentroid(subset, strokeIdToCentroid)
         if distance < maxDistance:
             optimizedUniquePartitionsByStrokeIds.append(subset)
 
-    print("Before optimiztion: Number of partitions =", len(uniquePartitionsByStrokeIds))
-    print("After optimiztion:  Number of partitions =", len(optimizedUniquePartitionsByStrokeIds))
+    print("Before proximity optimization: Number of partitions =", len(uniquePartitionsByStrokeIds))
+    print("After proximity optimization:  Number of partitions =", len(optimizedUniquePartitionsByStrokeIds))
 
     return optimizedUniquePartitionsByStrokeIds, strokeIdToSubsetId, strokeIdToSubset
 
@@ -251,20 +278,82 @@ def checkForStrokeCompleteSegmentation(segmentation, strokeIdToStroke, subsetIdT
     for count in strokeIdToCount.values():
         if count > 1:
             return False
-        if count == 0:
-            return False
+        #if count == 0:
+        #    return False
 
     return True
 
+# Recursive method
+def generateSegmentationSetsRecurse(segmentationSets, subsetIdToSubset, subsetIdentifier, inprogressSegment, inprogressStrokeIdToCount, strokeIdToStroke):
+    # Process the subset identifier...
+
+    # Iterate over the strokes in the subset and add to inprogressStrokeIdToCount
+    for strokeId in subsetIdToSubset[subsetIdentifier]:
+        count = inprogressStrokeIdToCount.get(strokeId, 0)
+        count += 1
+
+        # Determine if we've violated the stroke overlap rule
+        if count > 1:
+            #print("Violated overlap rule!")
+            return
+        else:
+            inprogressStrokeIdToCount[strokeId] = count
+
+    # Let's add the subset identifier to the inprogressSegment
+    inprogressSegment.append(subsetIdentifier)
+
+    # Determine if we've completed the segment by incorporating ALL strokes exactly once
+    strokesUsed = 0
+    for count in inprogressStrokeIdToCount.values():
+        strokesUsed += count
+    if strokesUsed == len(strokeIdToStroke.keys()):
+        # We're done!
+        #print("Found candidate segmentation: ", inprogressSegment)
+        segmentationSets.append(inprogressSegment)
+        return
+
+    # Identify remaining subsetIdentifiers...
+    remainingSubsetIdentifiers = list(set(subsetIdToSubset.keys()) - set(inprogressSegment))
+
+    # Iterate over remaining subsetIdentifiers...
+    for remainingSubsetIdentifier in remainingSubsetIdentifiers:
+        # Recurse to next level...
+        inprogressSegmentCopy = inprogressSegment.copy()
+        inprogressStrokeIdToCountCopy = inprogressStrokeIdToCount.copy()
+        generateSegmentationSetsRecurse(segmentationSets, subsetIdToSubset, remainingSubsetIdentifier, inprogressSegmentCopy, inprogressStrokeIdToCountCopy, strokeIdToStroke)
+
+    return
+
+# Recursively construct the segmentation sets without overlapping stroke ids
+def generateSegmentationSets(strokeIdToStroke, subsetIdToSubset):
+    segmentationSets = []
+
+    # Iterate over subsets
+    for subsetIdentifier in subsetIdToSubset.keys():
+        inprogressSegment = []
+        inprogressStrokeIdToCount = dict()
+        generateSegmentationSetsRecurse(segmentationSets, subsetIdToSubset, subsetIdentifier, inprogressSegment, inprogressStrokeIdToCount, strokeIdToStroke)
+
+    return segmentationSets
+
 # Method to use the predicted symbols and probabilities to generate possible segmentation sets
-def createSegmentationSets(strokeIdToStroke, uniquePartitionsByStrokeIds, subsetIdToPredictedSymbol, subsetIdToProbability, subsetIdToPredictedSymbolValid,
+def createSegmentationSets(minProbabilitySingle, minProbabilityMultiple, maxSymbols, strokeIdToStroke, uniquePartitionsByStrokeIds, subsetIdToPredictedSymbol, subsetIdToProbability, subsetIdToPredictedSymbolValid,
                            subsetIdToProbabilityValid, strokeIdToSubsetId, strokeIdToSubset):
     # First, let's filter down the uniquePartitionsByStrokesIds by eliminating all partitions that result in "Junk"
     subsetIdToSubset = dict()
     for subsetIdentifier in range(0, len(uniquePartitionsByStrokeIds)):
-        if subsetIdToPredictedSymbol.get(subsetIdentifier, "junk") != "junk":
+        predictedSymbol = subsetIdToPredictedSymbol.get(subsetIdentifier, "junk")
+        if predictedSymbol != "junk":
+            # Special case for "+" symbol, this requires 2 or fewer symbols.  When considering many strokes, it
+            # is easy for multiple strokes to be classified as a "+", for example: 1 / 1 looks like "+"
+            if predictedSymbol == "+" and len(uniquePartitionsByStrokeIds[subsetIdentifier]) > 2:
+                # False "+"
+                continue
+
             # Found a keeper, this subset is predicted to not be junk
             subsetIdToSubset[subsetIdentifier] = uniquePartitionsByStrokeIds[subsetIdentifier]
+        else:
+            print("Not keeping subsetid=", subsetIdentifier, ", symbol=", predictedSymbol, ", probability=", subsetIdToProbability[subsetIdentifier], ", subset=", uniquePartitionsByStrokeIds[subsetIdentifier])
 
     # Display the subsetIdentifiers and predictions that have been kept so far
     for subsetIdentifier in subsetIdToSubset.keys():
@@ -277,32 +366,141 @@ def createSegmentationSets(strokeIdToStroke, uniquePartitionsByStrokeIds, subset
     print("Remainder strokeIds predicted as junk=", remainingStrokeIds)
 
     # Re-classify these remainindStrokeIds using the valid symbols classifier
+    remainingStrokeSubsetIds = []
     for remainingStrokeId in remainingStrokeIds:
         subset = strokeIdToSubset[remainingStrokeId]
         subsetIdentifier = strokeIdToSubsetId[remainingStrokeId]
         #subset.append(remainingStrokeId)
         #subsetIdToSubset["remainder_" + remainingStrokeId] = subset
         subsetIdToSubset[subsetIdentifier] = subset
+        remainingStrokeSubsetIds.append(subsetIdentifier)
+
+    # Find the subsets containing only "1-count" strokes, these subsets MUST be in every segmentation
+    #prefix = remainingStrokeSubsetIds
+    prefix = []
+    strokeIdToCount = dict()
+    for subsetIdentifier in subsetIdToSubset.keys():
+        subset = subsetIdToSubset[subsetIdentifier]
+        for strokeId in subset:
+            count = strokeIdToCount.get(strokeId, 0)
+            count += 1
+            strokeIdToCount[strokeId] = count
+    for subsetIdentifier in subsetIdToSubset.keys():
+        # Check every stroke to see if this subset contains only "1-count" strokes
+        count = 0
+        subset = subsetIdToSubset[subsetIdentifier]
+        for strokeId in subset:
+            count += strokeIdToCount[strokeId]
+        if count == len(subset):
+            # Found subset containing all "1-count" strokes, add to our prefix
+            prefix.append(subsetIdentifier)
 
     # Construct the combinations of the subsetIds such that maximum strokes are included in each segmentation and there are no duplicates of strokeIds in the segmentation
     # Basically, construct the combinations of subsetIds from 1 to len(subsetIds
     # Generate unique partitions by stroke ids (with minimum size of 1 stroke)
+    #segmentationSets = generateSegmentationSets(strokeIdToStroke, subsetIdToSubset)
     segmentationSets = []
-    for L in range(1, len(subsetIdToSubset.keys()) + 1):
-        for segmentation in itertools.combinations(subsetIdToSubset.keys(), L):
+
+    # Optimization
+    #   Every segmentation MUST include all of the "remaining" strokes (as subsets), so these subsets
+    #   should prefix every segmentation possibility, and we should only permute over
+    #   the 'allSubsets' - 'remainder' as concatenations
+    #   Also... every segmentation must include all of the subsets containing only strokeIds
+    #   that are not included in any other subset.
+    allSubsetsRemainder = list(set(subsetIdToSubset.keys()) - set(prefix))
+
+    # Optimization
+    #   Eliminate all subsets that are below our minProbability threshold
+    #   This will reduce the problem space by eliminating unlikely choices
+    highProbabilitySubsetsRemainder = []
+    for subsetIdentifier in allSubsetsRemainder:
+        strokeCount = len(subsetIdToSubset[subsetIdentifier])
+        combinedSymbol = subsetIdToPredictedSymbol[subsetIdentifier]
+        combinedProbability = subsetIdToProbability[subsetIdentifier]
+        validProbability = subsetIdToProbabilityValid[subsetIdentifier]
+
+        # Apply the correct probability threshold depending on stroke composition
+        minProbability = minProbabilityMultiple
+        if strokeCount == 1:
+            minProbability = minProbabilityMultiple
+
+        if combinedSymbol == "junk":
+            if validProbability > minProbability:
+                # Meets our minimum probability threshold
+                highProbabilitySubsetsRemainder.append(subsetIdentifier)
+            else:
+                print("dropping low probability: subsetId=", subsetIdentifier, ", probability=", validProbability, ", subset=", subsetIdToSubset[subsetIdentifier])
+        else:
+            if combinedProbability > minProbability:
+                # Meets our minimum probability threshold
+                highProbabilitySubsetsRemainder.append(subsetIdentifier)
+            else:
+                print("dropping low probability: subsetId=", subsetIdentifier, ", probability=", combinedProbability, ", subset=", subsetIdToSubset[subsetIdentifier])
+    print("dropped low probability subset count =", len(allSubsetsRemainder) - len(highProbabilitySubsetsRemainder))
+
+    # If everything is in the prefix, then the prefix is our segmentation
+    if len(highProbabilitySubsetsRemainder) == 0:
+        segmentationSets.append(prefix)
+
+    print("prefix=", prefix)
+
+    for L in range(1, min(len(highProbabilitySubsetsRemainder) + 1, maxSymbols)):
+        print("About to get combinations for L=", L, ", totalSubsets=", len(highProbabilitySubsetsRemainder), ", prefix=", len(prefix))
+        for segmentation in itertools.combinations(highProbabilitySubsetsRemainder, L):
             # Check for complete segmentations
+            segmentation = list(prefix) + list(segmentation)
+            #print("candidateSegmentation=", segmentation)
             if checkForStrokeCompleteSegmentation(segmentation, strokeIdToStroke, subsetIdToSubset):
-                print("segmentation=", segmentation)
+                #print("segmentation=", segmentation)
                 segmentationSets.append(segmentation)
+
+    #for L in range(1, min(len(subsetIdToSubset.keys()) + 1, maxSymbols)):
+    #    print("About to get combinations for L=", L, ", totalSubsets=", len(subsetIdToSubset.keys()))
+    #    for segmentation in itertools.combinations(subsetIdToSubset.keys(), L):
+    #        # Check for complete segmentations
+    #        if checkForStrokeCompleteSegmentation(segmentation, strokeIdToStroke, subsetIdToSubset):
+    #            print("segmentation=", segmentation)
+    #            segmentationSets.append(segmentation)
 
     return segmentationSets, subsetIdToSubset
 
 # Method to select the best segmentation among those that are available
-def chooseBestSegmentation(segmentationSets, subsetIdToProbability):
+def chooseBestSegmentation(segmentationSets, subsetIdToPredictedSymbol, subsetIdToProbability, subsetIdToProbabilityValid, subsetIdToSubset, multiStrokeBonusProbability):
     # Return the best segmentation
+    maxScore = -99999.0
+    bestSegmentation = None
+
+    # Iterate over the segmentation sets
+    for segmentation in segmentationSets:
+        # segmentation is a list of subsetIdentifiers
+        score = 0.0
+        for subsetIdentifier in segmentation:
+            # Junk symbol predictions are replaced with Valid symbol predictions
+            if subsetIdToPredictedSymbol[subsetIdentifier] == "junk":
+                if len(subsetIdToSubset[subsetIdentifier]) > 1:
+                    # Multiple strokes!
+                    score += (subsetIdToProbabilityValid[subsetIdentifier] + multiStrokeBonusProbability) * len(subsetIdToSubset[subsetIdentifier])
+                else:
+                    # One stroke
+                    score += subsetIdToProbabilityValid[subsetIdentifier]
+            else:
+                if len(subsetIdToSubset[subsetIdentifier]) > 1:
+                    # Multiple strokes!
+                    score += (subsetIdToProbability[subsetIdentifier] + multiStrokeBonusProbability) * len(subsetIdToSubset[subsetIdentifier])
+                else:
+                    # One stroke
+                    score += subsetIdToProbability[subsetIdentifier]
+
+        # Check new max?
+        if score > maxScore:
+            maxScore = score
+            bestSegmentation = segmentation
+
+        # Report out score...
+        print("Segmentation: ", segmentation, ", score=", score)
 
     # TO-DO: For now, just return the first segmentation
-    return segmentationSets[0]
+    return bestSegmentation
 
 # Method to create a label graph (.lg) output file for the given segmentation
 def generateLabelGraphOutputFile(filename, segmentation, subsetIdToPredictedSymbol, subsetIdToPredictedSymbolValid, subsetIdToSubset):
@@ -344,10 +542,19 @@ def generateLabelGraphOutputFile(filename, segmentation, subsetIdToPredictedSymb
 # Segments the given input file, producing an .lg file as output
 def segment(fileList, mode):
     # Tuning parameters
-    maxDistance = 50            # Relative to min-max scaler of all strokes to maxWidth and maxHeight
-    maxStrokesPerSymbol = 5     # No specific support identified for the true upper limit for this
-    maxWidth = 100              # Min-Max scaler centroid x coordinates (0, maxWidth)
-    maxHeight = 100             # Min-Max scaler centroid y coordinates (0, maxHeight)
+    maxDistance = 10                    # Relative to min-max scaler of all strokes to maxWidth and maxHeight
+    maxStrokesPerSymbol = 5             # No specific support identified for the true upper limit for this
+    maxWidth = 100                      # Min-Max scaler centroid x coordinates (0, maxWidth)
+    maxHeight = 100                     # Min-Max scaler centroid y coordinates (0, maxHeight)
+    multiStrokeBonusProbability = 0.75  # Bonus probability added to real probability before applying length multiplier
+    maxSymbols = 30                     # Maximum number of symbols to support for combinatorics
+    minProbabilitySingle = 0.60         # Threshold for eliminating subsets (containing 1 stroke) with weak probabilities
+    minProbabilityMultiple = 0.50       # Threshold for eliminating subsets (containing multiple strokes) with weak probabilities
+
+    # Try to run it to completion faster...
+    maxDistance = 5 # Override
+    minProbabilitySingle = 0.70
+    minProbabilityMultiple = 0.60
 
     # Load up the models we will use for classification (from Project 1 deliverables)
     rf, encoderModel = loadModels("encoder_both_rf.pkl", "pickle_both_rf.pkl")
@@ -381,6 +588,7 @@ def segment(fileList, mode):
             # Classify this subset of strokes using the combined classifier
             predictedSymbol, probability = classifyStrokeSubset(featureStack, rf, encoderModel)
             #print("Predictions (combined) for subsetId=", subsetIdentifier, ": predictedSymbol=", predictedSymbol, ", probability=", probability, ", strokes=", uniquePartitionsByStrokeIds[subsetIdentifier])
+
             subsetIdToPredictedSymbol[subsetIdentifier] = predictedSymbol
             subsetIdToProbability[subsetIdentifier] = probability
 
@@ -391,11 +599,11 @@ def segment(fileList, mode):
             subsetIdToProbabilityValid[subsetIdentifier] = probability
 
         # Creates sets of partitions of strokes
-        segmentationSets, subsetIdToSubset = createSegmentationSets(strokeIdToStroke, uniquePartitionsByStrokeIds, subsetIdToPredictedSymbol, subsetIdToProbability, subsetIdToPredictedSymbolValid, subsetIdToProbabilityValid,
+        segmentationSets, subsetIdToSubset = createSegmentationSets(minProbabilitySingle, minProbabilityMultiple, maxSymbols, strokeIdToStroke, uniquePartitionsByStrokeIds, subsetIdToPredictedSymbol, subsetIdToProbability, subsetIdToPredictedSymbolValid, subsetIdToProbabilityValid,
                                                   strokeIdToSubsetId, strokeIdToSubset)
 
         # Chooses highest probability segmentation
-        segmentation = chooseBestSegmentation(segmentationSets, subsetIdToProbability)
+        segmentation = chooseBestSegmentation(segmentationSets, subsetIdToPredictedSymbol, subsetIdToProbability, subsetIdToProbabilityValid, subsetIdToSubset, multiStrokeBonusProbability)
 
         # Generates .lg output file using symbols and stroke ids
         generateLabelGraphOutputFile(filename, segmentation, subsetIdToPredictedSymbol, subsetIdToPredictedSymbolValid, subsetIdToSubset)
