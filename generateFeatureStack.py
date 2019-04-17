@@ -480,4 +480,4 @@ def getFeaturesForStrokes(subsetIdentifier, strokes):
 
     return symbolUIStack, np.array(symbolStack), targetStack;
 
-getFeatures("testInput")
+# getFeatures("testInput")
