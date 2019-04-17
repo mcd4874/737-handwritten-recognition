@@ -230,7 +230,7 @@ def getUniquePartitionsOfStrokes(strokeIdToStroke, maxDistance, maxStrokesPerSym
     strokeIdToSubset = dict()
 
     # Generate unique partitions by stroke ids (with minimum size of 1 stroke)
-    for L in range(1, min(len(strokeIds) + 1, maxStrokesPerSymbol)):
+    for L in range(1, min(len(strokeIds) + 1, maxStrokesPerSymbol + 1)):
         for subset in itertools.combinations(strokeIds, L):
             #print("subset=", subset)
             uniquePartitionsByStrokeIds.append(subset)
@@ -342,12 +342,24 @@ def createSegmentationSets(minProbabilitySingle, minProbabilityMultiple, maxSymb
     # First, let's filter down the uniquePartitionsByStrokesIds by eliminating all partitions that result in "Junk"
     subsetIdToSubset = dict()
     for subsetIdentifier in range(0, len(uniquePartitionsByStrokeIds)):
+        strokeCount = len(uniquePartitionsByStrokeIds[subsetIdentifier])
+        probabilityValid = subsetIdToProbabilityValid[subsetIdentifier]
+        probabilityCombined = subsetIdToProbability[subsetIdentifier]
+
         predictedSymbol = subsetIdToPredictedSymbol.get(subsetIdentifier, "junk")
         if predictedSymbol != "junk":
             # Special case for "+" symbol, this requires 2 or fewer symbols.  When considering many strokes, it
             # is easy for multiple strokes to be classified as a "+", for example: 1 / 1 looks like "+"
             if predictedSymbol == "+" and len(uniquePartitionsByStrokeIds[subsetIdentifier]) > 2:
                 # False "+"
+                continue
+
+            # Skip any subsets that don't meet our probability theshold
+            if strokeCount > 1 and probabilityCombined < minProbabilityMultiple:
+                print("multi-stroke subsetId=", subsetIdentifier, " has too low probability: ", probabilityCombined, " and ", probabilityValid)
+                continue
+            elif strokeCount == 1 and probabilityCombined < minProbabilitySingle:
+                print("singlestroke subsetId=", subsetIdentifier, " has too low probability: ", probabilityCombined, " and ", probabilityValid)
                 continue
 
             # Found a keeper, this subset is predicted to not be junk
@@ -422,7 +434,7 @@ def createSegmentationSets(minProbabilitySingle, minProbabilityMultiple, maxSymb
         # Apply the correct probability threshold depending on stroke composition
         minProbability = minProbabilityMultiple
         if strokeCount == 1:
-            minProbability = minProbabilityMultiple
+            minProbability = minProbabilitySingle
 
         if combinedSymbol == "junk":
             if validProbability > minProbability:
@@ -444,8 +456,16 @@ def createSegmentationSets(minProbabilitySingle, minProbabilityMultiple, maxSymb
 
     print("prefix=", prefix)
 
-    for L in range(1, min(len(highProbabilitySubsetsRemainder) + 1, maxSymbols)):
-        print("About to get combinations for L=", L, ", totalSubsets=", len(highProbabilitySubsetsRemainder), ", prefix=", len(prefix))
+    # Optimization
+    #   Limit the maxSymbols to the minimum of maxSymbols or # strokes ( less size of prefix
+    # <prefix.......> <highProbabilitySubsetsRemainder....>
+    # ----------------------|  <- strokes
+    #                |------|  <- strokes - prefix is the combinatoric piece
+    #maxSymbols = min(len(strokeIdToStroke.keys()) - len(prefix), maxSymbols - len(prefix))
+    maxSymbols = len(strokeIdToStroke.keys()) - len(prefix)
+
+    for L in range(1, min(len(highProbabilitySubsetsRemainder) + 1, maxSymbols + 1)):
+        print("About to get combinations for L=", L, ", totalSubsets=", len(highProbabilitySubsetsRemainder), ", prefix=", len(prefix), ", maxSymbols=", maxSymbols,", totalStrokes=", len(strokeIdToStroke.keys()))
         for segmentation in itertools.combinations(highProbabilitySubsetsRemainder, L):
             # Check for complete segmentations
             segmentation = list(prefix) + list(segmentation)
@@ -453,14 +473,6 @@ def createSegmentationSets(minProbabilitySingle, minProbabilityMultiple, maxSymb
             if checkForStrokeCompleteSegmentation(segmentation, strokeIdToStroke, subsetIdToSubset):
                 #print("segmentation=", segmentation)
                 segmentationSets.append(segmentation)
-
-    #for L in range(1, min(len(subsetIdToSubset.keys()) + 1, maxSymbols)):
-    #    print("About to get combinations for L=", L, ", totalSubsets=", len(subsetIdToSubset.keys()))
-    #    for segmentation in itertools.combinations(subsetIdToSubset.keys(), L):
-    #        # Check for complete segmentations
-    #        if checkForStrokeCompleteSegmentation(segmentation, strokeIdToStroke, subsetIdToSubset):
-    #            print("segmentation=", segmentation)
-    #            segmentationSets.append(segmentation)
 
     return segmentationSets, subsetIdToSubset
 
@@ -539,22 +551,8 @@ def generateLabelGraphOutputFile(filename, segmentation, subsetIdToPredictedSymb
 
     return
 
-# Segments the given input file, producing an .lg file as output
-def segment(fileList, mode):
-    # Tuning parameters
-    maxDistance = 10                    # Relative to min-max scaler of all strokes to maxWidth and maxHeight
-    maxStrokesPerSymbol = 5             # No specific support identified for the true upper limit for this
-    maxWidth = 100                      # Min-Max scaler centroid x coordinates (0, maxWidth)
-    maxHeight = 100                     # Min-Max scaler centroid y coordinates (0, maxHeight)
-    multiStrokeBonusProbability = 0.75  # Bonus probability added to real probability before applying length multiplier
-    maxSymbols = 30                     # Maximum number of symbols to support for combinatorics
-    minProbabilitySingle = 0.60         # Threshold for eliminating subsets (containing 1 stroke) with weak probabilities
-    minProbabilityMultiple = 0.50       # Threshold for eliminating subsets (containing multiple strokes) with weak probabilities
-
-    # Try to run it to completion faster...
-    maxDistance = 5 # Override
-    minProbabilitySingle = 0.70
-    minProbabilityMultiple = 0.60
+# Helper method to perform segmentation using the provided tuning parameters
+def segment_helper(fileList, mode, maxDistance, maxStrokesPerSymbol, maxWidth, maxHeight, multiStrokeBonusProbability, maxSymbols, minProbabilitySingle, minProbabilityMultiple):
 
     # Load up the models we will use for classification (from Project 1 deliverables)
     rf, encoderModel = loadModels("encoder_both_rf.pkl", "pickle_both_rf.pkl")
@@ -610,21 +608,69 @@ def segment(fileList, mode):
 
     return
 
+# Segments the given input file, producing an .lg file as output using a baseline segmentation approach
+def real_segment(fileList, mode):
+    # Tuning parameters
+    maxDistance = 10                    # Relative to min-max scaler of all strokes to maxWidth and maxHeight
+    maxStrokesPerSymbol = 4             # No specific support identified for the true upper limit for this
+    maxWidth = 100                      # Min-Max scaler centroid x coordinates (0, maxWidth)
+    maxHeight = 100                     # Min-Max scaler centroid y coordinates (0, maxHeight)
+    multiStrokeBonusProbability = 0.75  # Bonus probability added to real probability before applying length multiplier
+    maxSymbols = 30                     # Maximum number of symbols to support for combinatorics
+    minProbabilitySingle = 0.50 #0.60   # Threshold for eliminating subsets (containing 1 stroke) with weak probabilities
+    minProbabilityMultiple = 0.40 #0.50 # Threshold for eliminating subsets (containing multiple strokes) with weak probabilities
+    #maxSymbolToStrokeRatio = 0.75      # Threshold for limiting max symbols to no more than this ratio against Stroke count
+
+    segment_helper(fileList, mode,
+                   maxDistance=maxDistance,
+                   maxStrokesPerSymbol=maxStrokesPerSymbol,
+                   maxWidth=maxWidth,
+                   maxHeight=maxHeight,
+                   multiStrokeBonusProbability=multiStrokeBonusProbability,
+                   maxSymbols=maxSymbols,
+                   minProbabilitySingle=minProbabilitySingle,
+                   minProbabilityMultiple=minProbabilityMultiple)
+    return
+
+# Segments the given input file, producing an .lg file as output using a baseline segmentation approach
+def baseline_segment(fileList, mode):
+    # Tuning parameters
+    maxDistance = 5                     # Relative to min-max scaler of all strokes to maxWidth and maxHeight
+    maxStrokesPerSymbol = 2             # No specific support identified for the true upper limit for this
+    maxWidth = 100                      # Min-Max scaler centroid x coordinates (0, maxWidth)
+    maxHeight = 100                     # Min-Max scaler centroid y coordinates (0, maxHeight)
+    multiStrokeBonusProbability = 0.0   # Bonus probability added to real probability before applying length multiplier
+    maxSymbols = 30                     # Maximum number of symbols to support for combinatorics
+    minProbabilitySingle = 0.00         # Threshold for eliminating subsets (containing 1 stroke) with weak probabilities
+    minProbabilityMultiple = 0.00       # Threshold for eliminating subsets (containing multiple strokes) with weak probabilities
+
+    segment_helper(fileList, mode,
+                   maxDistance=maxDistance,
+                   maxStrokesPerSymbol=maxStrokesPerSymbol,
+                   maxWidth=maxWidth,
+                   maxHeight=maxHeight,
+                   multiStrokeBonusProbability=multiStrokeBonusProbability,
+                   maxSymbols=maxSymbols,
+                   minProbabilitySingle=minProbabilitySingle,
+                   minProbabilityMultiple=minProbabilityMultiple)
+
+    return
+
 # Main entry point for the program
 def main():
     # Initial mode of operation
-    mode = "test"
+    mode = "real"
 
     # Print usage...
     if(len(sys.argv) < 2):
         print("Usage:")
-        print("  segmenter.py [<train|test>] <inputFile>")
+        print("  segmenter.py [real|baseline>] <inputFile>")
         print("")
-        print("  <train|test>  Optional: Specify 'train' to train the segmenter on a list of files, OR...")
-        print("                          Specify 'test' to test the segmenter on a list of files")
-        print("  <inputFile>   When NOT train or test, an .inkml file to be segmented to produce ")
-        print("                          an .lg file with the same filename prefix.")
-        print("                When train or test, a file containing a list of files.")
+        print("  <real|baseline>  Optional: Specify 'real' to use sophisticated segmenter on a list of files, OR...")
+        print("                             Specify 'baseline' to use baseline segmenter on a list of files")
+        print("  <inputFile>      When NOT real or baseline, an .inkml file to be segmented to produce ")
+        print("                             an .lg file with the same filename prefix.")
+        print("                   When real or baseline, a file containing a list of files.")
         print("")
         return
 
@@ -633,9 +679,11 @@ def main():
 
     # Extract the first parameter
     firstParameter = sys.argv[1]
-    if firstParameter == "train" or firstParameter == "test":
-        if firstParameter == "train":
-            mode = "train"
+    if firstParameter == "real" or firstParameter == "baseline":
+        if firstParameter == "real":
+            mode = "real"
+        else:
+            mode = "baseline"
         inputFile = sys.argv[2]
         fileList = open(inputFile).readlines()
     else:
@@ -645,7 +693,11 @@ def main():
     print("mode=", mode, ", fileList=", fileList)
 
     # Segment the input files
-    segment(fileList, mode)
+    if mode == "real":
+        real_segment(fileList, mode)
+    if mode == "baseline":
+        print("Using baseline segmenter.")
+        baseline_segment(fileList, mode)
 
     return
 

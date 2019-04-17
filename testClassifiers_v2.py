@@ -129,7 +129,7 @@ def classifyStrokeSubset(featureStack, rf, encoderModel):
         # Reverese the results so it is in decreasing accuracy order...
         resultVector.reverse()
 
-    predictedSymbol = resultVector[0]
+    predictedSymbol = resultVector[0].replace("\\\\", "\\")
     probability = np.sort(predict_probs[0])[len(predict_probs[0])-1]
     #print("Prediction symbol=", predictedSymbol, ", probability=", probability)
 
