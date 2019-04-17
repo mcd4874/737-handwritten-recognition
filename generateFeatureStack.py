@@ -370,6 +370,70 @@ def appendImageFeatures(stack, imageDictionary):
 
     return newStack
 
+# Get the aspect ratio as height/width as a float
+def getAspectRatio(strokes):
+    aspectRatio = 1.0
+
+    # Extremities
+    upperLeftX = 99999.0
+    upperLeftY = 99999.0
+    lowerRightX = -99999.0
+    lowerRightY = -99999.0
+
+    # Iterate over stroke coordinate and record the upper left and lower right extrema points
+    for strokeCoordinate in strokes:
+        if strokeCoordinate[1] < upperLeftX:
+            upperLeftX = strokeCoordinate[1]
+        if strokeCoordinate[1] > lowerRightX:
+            lowerRightX = strokeCoordinate[1]
+        if strokeCoordinate[2] < upperLeftY:
+            upperLeftY = strokeCoordinate[2]
+        if strokeCoordinate[2] > lowerRightY:
+            lowerRightY = strokeCoordinate[2]
+
+    # Calculate aspect ratio
+    width = abs(lowerRightX - upperLeftX)
+    height = abs(lowerRightY - upperLeftY)
+
+    # Protection against divide-by-zero errors
+    if width < 0.01:
+        aspectRatio = 1.0
+    else:
+        aspectRatio = float(height)/float(width)
+
+    return aspectRatio
+
+# Appends the Project 2 enhanced features to the feature vectors
+def appendProject2Features(stack, symbolsDictionary):
+    newStack = []
+
+    keys = list(symbolsDictionary)
+    for i in range(len(stack)):
+        id = keys[i]
+        #print("Appending Project 2 features for id=", id)
+        features = stack[i]
+        newFeatures = features.copy()
+
+        # Initialize project2 features
+        project2Features = []
+
+        # Add number of strokes as a feature
+        strokesData = symbolsDictionary[id]
+        i, j = strokesData.shape
+        strokeCount = strokesData[i-1][0] + 1
+        project2Features.append(strokeCount)
+
+        # Add aspect ratio as a feature
+        aspectRatio = getAspectRatio(strokesData)
+        project2Features.append(aspectRatio)
+
+        newFeatures.extend(project2Features)
+        #print("project2features: ", project2Features)
+        #print("New features with project2features: ", newFeatures)
+        newStack.append(newFeatures)
+
+    return newStack
+
 # Utility method called by testClassifiers_v2 to retrieve all of the features for the
 # samples denoted in the given input file
 def getFeatures(inputFile):
@@ -385,6 +449,9 @@ def getFeatures(inputFile):
     symbolsImageDictionary = dict()
     symbolIdToUILookup = dict()
 
+    # Project 2 extension...
+    symbolsDictionaryNotNormalized = dict()
+
     # Load the input file
     data = np.genfromtxt(inputFile, delimiter=',', dtype=str)
 
@@ -396,9 +463,11 @@ def getFeatures(inputFile):
         if len(data.shape) > 1:
             print("input: ", data[i][0])
             loadSampleIntoDictionary(symbolIdToUILookup, symbolsDictionary, data[i][0])
+            loadSampleIntoDictionary(symbolIdToUILookup, symbolsDictionaryNotNormalized, data[i][0])
         else:
             print("input: ", data[i])
             loadSampleIntoDictionary(symbolIdToUILookup, symbolsDictionary, data[i])
+            loadSampleIntoDictionary(symbolIdToUILookup, symbolsDictionaryNotNormalized, data[i])
 
         if len(data.shape) > 1:
             # Binarize the target stack
@@ -423,6 +492,9 @@ def getFeatures(inputFile):
     symbolStack = appendImageFeatures(symbolStack, symbolsImageDictionary)
     #print("stack shape after append image features=", len(symbolStack[0]))
 
+    # Project 2 extension...
+    symbolStack = appendProject2Features(symbolStack, symbolsDictionaryNotNormalized)
+
     #saveCSV(symbolUIStack, symbolStack, "./symbolStack.csv")
 
     return symbolUIStack, np.array(symbolStack), targetStack;
@@ -442,6 +514,9 @@ def getFeaturesForStrokes(subsetIdentifier, strokes):
     symbolsImageDictionary = dict()
     symbolIdToUILookup = dict()
 
+    # Project 2 extension...
+    symbolsDictionaryNotNormalized = dict()
+
     # Construct the target stack (if its available)
     targetStack = []
 
@@ -457,6 +532,9 @@ def getFeaturesForStrokes(subsetIdentifier, strokes):
 
     # Add symbol to our dictionary
     symbolsDictionary[subsetIdentifier] = strokes3d
+
+    # Project 2 extension...
+    symbolsDictionaryNotNormalized[subsetIdentifier] = strokes3d
 
     # Perform normalization to all samples in our dictionary
     normalizeSamples(symbolsDictionary, w, h)
@@ -476,6 +554,9 @@ def getFeaturesForStrokes(subsetIdentifier, strokes):
     symbolStack = appendImageFeatures(symbolStack, symbolsImageDictionary)
     #print("stack shape after append image features=", len(symbolStack[0]))
 
+    # Project 2 extension...
+    symbolStack = appendProject2Features(symbolStack, symbolsDictionaryNotNormalized)
+
     #saveCSV(symbolUIStack, symbolStack, "./symbolStack.csv")
 
-    return symbolUIStack, np.array(symbolStack), targetStack;
+    return symbolUIStack, np.array(symbolStack), targetStack

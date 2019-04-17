@@ -16,6 +16,7 @@ import math
 import xml.etree.ElementTree as ET
 import os
 import cv2
+from generateFeatureStack import getAspectRatio
 
 
 # Function to normalize the (x,y) coordinates contained within the given dictionary according to
@@ -309,6 +310,36 @@ def featureCountNormalization(stack, featureCount):
 
     return newStack
 
+# Appends the Project 2 enhanced features to the feature vectors
+def appendProject2Features(stack, symbolsDictionary):
+    newStack = []
+
+    for i in range(len(stack)):
+        id = str(i)
+        print("Appending Project 2 features for id=", id)
+        features = stack[i]
+        newFeatures = features.copy()
+
+        # Initialize project2 features
+        project2Features = []
+
+        # Add number of strokes as a feature
+        strokesData = symbolsDictionary[id]
+        i, j = strokesData.shape
+        strokeCount = strokesData[i-1][0] + 1
+        project2Features.append(strokeCount)
+
+        # Add aspect ratio as a feature
+        aspectRatio = getAspectRatio(strokesData)
+        project2Features.append(aspectRatio)
+
+        newFeatures.extend(project2Features)
+        print("project2features: ", project2Features)
+        #print("New features with project2features: ", newFeatures)
+        newStack.append(newFeatures)
+
+    return newStack
+
 # Appends the orientation angle histogram bins to the feature vectors
 def appendBinFeatures(stack, binCount):
     newStack = []
@@ -378,11 +409,18 @@ def main():
     symbolsImageDictionary = dict()
     junkImageDictionary = dict()
     symbolIdToUILookup = dict()
-    junkIdToUILookup = dict();
+    junkIdToUILookup = dict()
+    symbolsDictionaryNotNormalized = dict()
+    junkDictionaryNotNormalized = dict()
 
     # Load Symbols and Junk samples into the common dictionary, indexed by UI "unique identifier?"
     loadSamplesIntoDictionary(symbolIdToUILookup, symbolsDictionary, "./trainingSymbols/", limit)
     loadSamplesIntoDictionary(junkIdToUILookup, junkDictionary, "./trainingJunk/", limit)
+
+    # Project 2 extension...
+    # Load the samples again to get a separate "not normalized" set
+    loadSamplesIntoDictionary(symbolIdToUILookup, symbolsDictionaryNotNormalized, "./trainingSymbols/", limit)
+    loadSamplesIntoDictionary(junkIdToUILookup, junkDictionaryNotNormalized, "./trainingJunk/", limit)
 
     # Perform normalization to all samples in our dictionary
     normalizeSamples(symbolsDictionary, w, h)
@@ -403,12 +441,18 @@ def main():
     symbolStack = appendBinFeatures(symbolStack, binCount)
     symbolStack = appendImageFeatures(symbolStack, symbolsImageDictionary)
 
+    # Project 2 extension...
+    symbolStack = appendProject2Features(symbolStack, symbolsDictionaryNotNormalized)
+
     junkUIStack, junkStack = generateFeatureStack(junkIdToUILookup, junkDictionary)
     junkStack = orientationNormalization(junkStack, sector)
     junkStack = deduplicationNormalization(junkStack)
     junkStack = featureCountNormalization(junkStack, featureCount)
     junkStack = appendBinFeatures(junkStack, binCount)
     junkStack = appendImageFeatures(junkStack, junkImageDictionary)
+
+    # Project 2 extension...
+    junkStack = appendProject2Features(junkStack, junkDictionaryNotNormalized)
 
     #print("stack=", stack)
 
