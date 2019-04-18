@@ -15,7 +15,8 @@ from sklearn.preprocessing import MinMaxScaler
 from generateFeatureStack import getFeaturesForStrokes
 from testClassifiers_v2 import loadModels
 from testClassifiers_v2 import classifyStrokeSubset
-
+import os
+from os import path
 
 # Extract the list of symbols from the given inkml file
 def extractSymbolsFromFile(filename):
@@ -515,15 +516,24 @@ def chooseBestSegmentation(segmentationSets, subsetIdToPredictedSymbol, subsetId
     return bestSegmentation
 
 # Method to create a label graph (.lg) output file for the given segmentation
-def generateLabelGraphOutputFile(filename, segmentation, subsetIdToPredictedSymbol, subsetIdToPredictedSymbolValid, subsetIdToSubset):
+def generateLabelGraphOutputFile(filename, outputDir,segmentation, subsetIdToPredictedSymbol, subsetIdToPredictedSymbolValid, subsetIdToSubset):
     # Calculate filename prefix
     prefix = filename.split(".inkml")[0]
 
     # Output filename
     outputFilename = prefix + ".lg"
+    print( outputFilename.split('/')[2:])
+    dirPath = outputFilename.split('/')[2:-1]
+    filePath = outputFilename.split('/')[-1]
+    outputDirList = outputDir+'/'.join(dirPath)
+    outputFilename = outputDirList+"/"+filePath
     print("outputFilename=", outputFilename)
-
+    # outputFilename = outputDir+outputFilename
+    if not os.path.exists(outputDirList):
+        os.makedirs(outputDirList)
     outputFile = open(outputFilename, "w+")
+
+
 
     # Use dictionary as symbol counter
     symbolToCount = dict()
@@ -552,7 +562,7 @@ def generateLabelGraphOutputFile(filename, segmentation, subsetIdToPredictedSymb
     return
 
 # Helper method to perform segmentation using the provided tuning parameters
-def segment_helper(fileList, mode, maxDistance, maxStrokesPerSymbol, maxWidth, maxHeight, multiStrokeBonusProbability, maxSymbols, minProbabilitySingle, minProbabilityMultiple):
+def segment_helper(fileList, outputDir, mode, maxDistance, maxStrokesPerSymbol, maxWidth, maxHeight, multiStrokeBonusProbability, maxSymbols, minProbabilitySingle, minProbabilityMultiple):
 
     # Load up the models we will use for classification (from Project 1 deliverables)
     rf, encoderModel = loadModels("encoder_both_rf.pkl", "pickle_both_rf.pkl")
@@ -604,12 +614,12 @@ def segment_helper(fileList, mode, maxDistance, maxStrokesPerSymbol, maxWidth, m
         segmentation = chooseBestSegmentation(segmentationSets, subsetIdToPredictedSymbol, subsetIdToProbability, subsetIdToProbabilityValid, subsetIdToSubset, multiStrokeBonusProbability)
 
         # Generates .lg output file using symbols and stroke ids
-        generateLabelGraphOutputFile(filename, segmentation, subsetIdToPredictedSymbol, subsetIdToPredictedSymbolValid, subsetIdToSubset)
+        generateLabelGraphOutputFile(filename, outputDir,segmentation, subsetIdToPredictedSymbol, subsetIdToPredictedSymbolValid, subsetIdToSubset)
 
     return
 
 # Segments the given input file, producing an .lg file as output using a baseline segmentation approach
-def real_segment(fileList, mode):
+def real_segment(fileList, outputDir,mode):
     # Tuning parameters
     maxDistance = 10                    # Relative to min-max scaler of all strokes to maxWidth and maxHeight
     maxStrokesPerSymbol = 4             # No specific support identified for the true upper limit for this
@@ -621,7 +631,7 @@ def real_segment(fileList, mode):
     minProbabilityMultiple = 0.40 #0.50 # Threshold for eliminating subsets (containing multiple strokes) with weak probabilities
     #maxSymbolToStrokeRatio = 0.75      # Threshold for limiting max symbols to no more than this ratio against Stroke count
 
-    segment_helper(fileList, mode,
+    segment_helper(fileList, outputDir ,mode,
                    maxDistance=maxDistance,
                    maxStrokesPerSymbol=maxStrokesPerSymbol,
                    maxWidth=maxWidth,
@@ -633,7 +643,7 @@ def real_segment(fileList, mode):
     return
 
 # Segments the given input file, producing an .lg file as output using a baseline segmentation approach
-def baseline_segment(fileList, mode):
+def baseline_segment(fileList, outputDir,mode):
     # Tuning parameters
     maxDistance = 5                     # Relative to min-max scaler of all strokes to maxWidth and maxHeight
     maxStrokesPerSymbol = 2             # No specific support identified for the true upper limit for this
@@ -644,7 +654,7 @@ def baseline_segment(fileList, mode):
     minProbabilitySingle = 0.00         # Threshold for eliminating subsets (containing 1 stroke) with weak probabilities
     minProbabilityMultiple = 0.00       # Threshold for eliminating subsets (containing multiple strokes) with weak probabilities
 
-    segment_helper(fileList, mode,
+    segment_helper(fileList,outputDir ,mode,
                    maxDistance=maxDistance,
                    maxStrokesPerSymbol=maxStrokesPerSymbol,
                    maxWidth=maxWidth,
@@ -676,7 +686,7 @@ def main():
 
     # Initialize the file list
     fileList = []
-
+    outputDir = './predict_lg/'
     # Extract the first parameter
     firstParameter = sys.argv[1]
     if firstParameter == "real" or firstParameter == "baseline":
@@ -685,6 +695,8 @@ def main():
         else:
             mode = "baseline"
         inputFile = sys.argv[2]
+        # path to directory to save output .lg. use the format /<dir>/
+        outputDir = sys.argv[3]
         fileList = open(inputFile).readlines()
     else:
         fileList.append(sys.argv[1].strip())
@@ -694,10 +706,10 @@ def main():
 
     # Segment the input files
     if mode == "real":
-        real_segment(fileList, mode)
+        real_segment(fileList,outputDir, mode)
     if mode == "baseline":
         print("Using baseline segmenter.")
-        baseline_segment(fileList, mode)
+        baseline_segment(fileList,outputDir, mode)
 
     return
 
