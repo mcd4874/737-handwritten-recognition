@@ -15,8 +15,7 @@ from sklearn.preprocessing import MinMaxScaler
 from generateFeatureStack import getFeaturesForStrokes
 from testClassifiers_v2 import loadModels
 from testClassifiers_v2 import classifyStrokeSubset
-import os
-from os import path
+
 
 # Extract the list of symbols from the given inkml file
 def extractSymbolsFromFile(filename):
@@ -92,6 +91,91 @@ def extractStrokes(filename, mode):
         print("ParseError on ", filename)
 
     return strokeIdToStroke, gt_strokeIdToSymbolId, gt_symbolIdToSymbol
+# Returns the centroid (or mean (x,y) position) for each stroke
+# The strokes are Min-Max scaled to a range of [0,maxWidth] and [0,maxHeight] for x and y respectively,
+# but this is done preserving the aspect ratio.  To preserve the aspect ratio, an alternate of
+# either maxWidth or maxHeight will be calculated and used for this Min-Max scaling.
+# The "shortest" true dimension is scaled to 100, the longest true dimension is scaled to a ratio
+# of the shortest dimension * 100
+def calculateCentroidsByStrokeIdPreservingAspectRatio(strokeIdToStroke, maxWidth, maxHeight):
+    strokeIdToCentroid = dict()
+
+    # Determine the global peaks/troughs for x,y values across all strokes
+    peakX = -99999.0
+    peakY = -99999.0
+    troughX = 99999.0
+    troughY = 99999.0
+
+    # Initialize our scaling target
+    centroids = np.full((len(strokeIdToStroke.keys()), 2), 0.0, dtype=float)
+
+    # Iterate over all of the strokes..
+    index = 0
+    for strokeId in strokeIdToStroke.keys():
+        # Coordinates
+        x = 0.0
+        y = 0.0
+
+        stroke = strokeIdToStroke[strokeId]
+        coordinateStrings = str(stroke).split(',')
+        for coordinateString in coordinateStrings:
+            clean = coordinateString.strip()
+            elements = clean.split(' ')
+            xValue = float(elements[0])
+            yValue = float(elements[1])
+            x += xValue
+            y += yValue
+
+            # Update peaks and troughs
+            if xValue > peakX:
+                peakX = xValue
+            if xValue < troughX:
+                troughX = xValue
+            if yValue > peakY:
+                peakY = yValue
+            if yValue < troughY:
+                troughY = yValue
+
+        # Save the centroid in the map
+        centroid = [float(x)/float(len(stroke)), float(y)/float(len(stroke))]
+        #print("Centroid = ", centroid)
+        strokeIdToCentroid[strokeId] = centroid
+
+        # Save the centroid in the np.array
+        centroids[index][0] = centroid[0]
+        centroids[index][1] = centroid[1]
+
+        # Increment index
+        index += 1
+
+    # Use the peaks and troughs to preserve aspect ratio
+    trueHeight = abs(peakY - troughY)
+    trueWidth = abs(peakX - troughX)
+    scaleWidth = maxWidth
+    scaleHeight = maxHeight
+    if trueHeight > trueWidth:
+        # Height is the primary dimension, scale Height accordingly to multiple of maxHeight
+        scaleHeight = float(float(trueHeight) / float(trueWidth)) * maxHeight
+    else:
+        # Width is the primary dimension, scale Width accordingly to multiple of maxWidth
+        scaleWidth = float(float(trueWidth) / float(trueHeight)) * maxWidth
+
+    # Min-Max scale the centroid positions according to the global peaks and troughs
+    scalerX = MinMaxScaler(feature_range=(0, scaleWidth), copy=False)
+    scalerY = MinMaxScaler(feature_range=(0, scaleHeight), copy=False)
+
+    scalerX.fit(centroids[:, 0:1])
+    scalerX.transform(centroids[:, 0:1])
+    scalerY.fit(centroids[:, 1:2])
+    scalerY.transform(centroids[:, 1:2])
+
+    # Update the strokeIdToCentroid map with our scaled centroids
+    index = 0
+    for strokeId in strokeIdToCentroid.keys():
+        strokeIdToCentroid[strokeId] = centroids[index]
+        index += 1
+
+    return strokeIdToCentroid
 
 # Returns the centroid (or mean (x,y) position) for each stroke
 # The strokes are Min-Max scaled to a range of [0,maxWidth] and [0,maxHeight] for x and y respectively.
@@ -163,6 +247,7 @@ def calculateCentroidsByStrokeId(strokeIdToStroke, maxWidth, maxHeight):
 
     return strokeIdToCentroid
 
+
 # Helper method to calculate the centroid of a subset of strokes
 def calculateCentroidOfSubset(subset, strokeIdToCentroid):
     # Calculate the centroid of the subset
@@ -213,15 +298,34 @@ def calculateMaxDistanceToCentroid(subset, strokeIdToCentroid):
 
     return maxDistance
 
+# Calculates whether all of the stroke centroids are within the limitDistance to subset's centroid
+def withinLimitDistanceToCentroid(subset, strokeIdToCentroid, limitDistance):
+    # Calculate the centroid of the subset
+    centroidOfSubset = calculateCentroidOfSubset(subset, strokeIdToCentroid)
+
+    # Calculate the distance from the centroidOfSubset to furthest centroid
+    for strokeId in subset:
+        centroid = strokeIdToCentroid[strokeId]
+
+        # Generate the Euclidean distances from the subset centroid to each stroke's centroid
+        distance = math.sqrt(math.pow(centroidOfSubset[0] - centroid[0], 2) + math.pow(centroidOfSubset[1] - centroid[1], 2))
+
+        # Check if limit has been exceeded
+        if distance > limitDistance:
+            return False
+
+    return True
+
 # Returns the list of unique partitions of stroke ids and list of unique partitions of strokes
 # restricted by the sum of all distances being less than or equal to the given maxDistance parameter.
 # The strokes are Min-Max scaled to a range of [0,maxWidth] and [0,maxHeight] for x and y respectively.
-def getUniquePartitionsOfStrokes(strokeIdToStroke, maxDistance, maxStrokesPerSymbol, maxWidth, maxHeight):
+def getUniquePartitionsOfStrokes(strokeCountToSetSizeToCombinations, strokeIdToStroke, maxDistance, maxStrokesPerSymbol, maxWidth, maxHeight):
     # Get the lists of keys and values
     strokeIds = strokeIdToStroke.keys()
 
     # Build up centroid positions for the given strokes
-    strokeIdToCentroid = calculateCentroidsByStrokeId(strokeIdToStroke, maxWidth, maxHeight)
+    #strokeIdToCentroid = calculateCentroidsByStrokeId(strokeIdToStroke, maxWidth, maxHeight)
+    strokeIdToCentroid = calculateCentroidsByStrokeIdPreservingAspectRatio(strokeIdToStroke, maxWidth, maxHeight)
 
     # Initialize uniquePartitions
     uniquePartitionsByStrokeIds = []
@@ -232,7 +336,33 @@ def getUniquePartitionsOfStrokes(strokeIdToStroke, maxDistance, maxStrokesPerSym
 
     # Generate unique partitions by stroke ids (with minimum size of 1 stroke)
     for L in range(1, min(len(strokeIds) + 1, maxStrokesPerSymbol + 1)):
-        for subset in itertools.combinations(strokeIds, L):
+        # See if we already have cached combinations to use...
+        strokeCount = len(strokeIds)
+
+        #print("strokeCountToSetSizeToCombinations count=", len(strokeCountToSetSizeToCombinations.keys()))
+
+        # Use caching to increase performance
+        strokeCountToSetSize = strokeCountToSetSizeToCombinations.get(strokeCount, None)
+        if strokeCountToSetSize == None:
+            strokeCountToSetSize = dict()
+            strokeCountToSetSizeToCombinations[strokeCount] = strokeCountToSetSize
+
+        # Use caching to increase performance
+        setSizeToCombinations = strokeCountToSetSize.get(L, dict())
+        strokeCountToSetSize[L] = setSizeToCombinations
+
+        # Use caching to increase performance
+        combinations = setSizeToCombinations.get(L, None)
+        if combinations == None:
+            combinations = list(itertools.combinations(strokeIds, L))
+            setSizeToCombinations[L] = combinations
+            print("Caching combinations for setSize [", L, "], combinations=", len(combinations))
+        else:
+            print("Re-using cached combinations for setSize [", L, "], combinations=", len(combinations))
+        #combinations = setSizeToCombinations.get(L, itertools.combinations(strokeIds, L))
+
+        #for subset in itertools.combinations(strokeIds, L):
+        for subset in combinations:
             #print("subset=", subset)
             uniquePartitionsByStrokeIds.append(subset)
 
@@ -242,16 +372,20 @@ def getUniquePartitionsOfStrokes(strokeIdToStroke, maxDistance, maxStrokesPerSym
                 strokeIdToSubsetId[subset[0]] = len(uniquePartitionsByStrokeIds) - 1
                 strokeIdToSubset[subset[0]] = subset
 
+    print("Before proximity optimization: Number of partitions =", len(uniquePartitionsByStrokeIds))
+
     # Calculate the sum distance from centroid for each subset
     optimizedUniquePartitionsByStrokeIds = []
     for subset in uniquePartitionsByStrokeIds:
         #print("Processing subset=", subset)
         #distance = calculateSumOfDistancesToCentroid(subset, strokeIdToCentroid)
-        distance = calculateMaxDistanceToCentroid(subset, strokeIdToCentroid)
-        if distance < maxDistance:
+
+        # TODO- move distance into calculateMaxDistance
+        #distance = calculateMaxDistanceToCentroid(subset, strokeIdToCentroid)
+        #if distance < maxDistance:
+        if withinLimitDistanceToCentroid(subset, strokeIdToCentroid, maxDistance) == True:
             optimizedUniquePartitionsByStrokeIds.append(subset)
 
-    print("Before proximity optimization: Number of partitions =", len(uniquePartitionsByStrokeIds))
     print("After proximity optimization:  Number of partitions =", len(optimizedUniquePartitionsByStrokeIds))
 
     return optimizedUniquePartitionsByStrokeIds, strokeIdToSubsetId, strokeIdToSubset
@@ -259,7 +393,7 @@ def getUniquePartitionsOfStrokes(strokeIdToStroke, maxDistance, maxStrokesPerSym
 # Method to check that the given segmentation is eactly a complete segmentation
 #  Meaning, reject segmentations that include the same stroke more than once
 #  Meaning, reject segmentations that do not include all strokes
-def checkForStrokeCompleteSegmentation(segmentation, strokeIdToStroke, subsetIdToSubset):
+def checkForStrokeCompleteSegmentation(segmentation, strokeIdToStroke, subsetIdToSubset, strokeIdToSubsetId, subsetIdToPredictedSymbolValid, subsetIdToPredictedSymbol):
     # Build a full set of strokeIds
     strokeIds = list(strokeIdToStroke.keys()).copy()
 
@@ -276,11 +410,18 @@ def checkForStrokeCompleteSegmentation(segmentation, strokeIdToStroke, subsetIdT
 
     # Check for overlapping strokes (count > 1)
     # Check for missing strokes (count = 0)
-    for count in strokeIdToCount.values():
+    for strokeId in strokeIdToCount.keys():
+        count = strokeIdToCount[strokeId]
         if count > 1:
             return False
-        #if count == 0:
-        #    return False
+        if count == 0:
+            # Add the single stroke subsetIdentifier to our segment, so we eliminate all Absences
+            strokeSubset = []
+            strokeSubset.append(strokeId)
+            subsetIdentifier = int(strokeId)  # Special case only works for single-stroke subsets
+            subsetIdToSubset[subsetIdentifier] = strokeSubset
+            segmentation.append(subsetIdentifier)
+            print("Adding absent stroke's subset to segmentation: strokeId=", strokeId, ", subsetId=", strokeIdToSubsetId[strokeId])
 
     return True
 
@@ -347,6 +488,7 @@ def createSegmentationSets(minProbabilitySingle, minProbabilityMultiple, maxSymb
         probabilityValid = subsetIdToProbabilityValid[subsetIdentifier]
         probabilityCombined = subsetIdToProbability[subsetIdentifier]
 
+        predictedSymbolValid = subsetIdToPredictedSymbolValid.get(subsetIdentifier, "junk")
         predictedSymbol = subsetIdToPredictedSymbol.get(subsetIdentifier, "junk")
         if predictedSymbol != "junk":
             # Special case for "+" symbol, this requires 2 or fewer symbols.  When considering many strokes, it
@@ -366,7 +508,7 @@ def createSegmentationSets(minProbabilitySingle, minProbabilityMultiple, maxSymb
             # Found a keeper, this subset is predicted to not be junk
             subsetIdToSubset[subsetIdentifier] = uniquePartitionsByStrokeIds[subsetIdentifier]
         else:
-            print("Not keeping subsetid=", subsetIdentifier, ", symbol=", predictedSymbol, ", probability=", subsetIdToProbability[subsetIdentifier], ", subset=", uniquePartitionsByStrokeIds[subsetIdentifier])
+            print("Not keeping subsetid=", subsetIdentifier, ", symbol=", predictedSymbol, ", probability=", subsetIdToProbability[subsetIdentifier], ", subset=", uniquePartitionsByStrokeIds[subsetIdentifier], ", vsymbol=", predictedSymbolValid, ", vprobability=", probabilityValid)
 
     # Display the subsetIdentifiers and predictions that have been kept so far
     for subsetIdentifier in subsetIdToSubset.keys():
@@ -471,7 +613,7 @@ def createSegmentationSets(minProbabilitySingle, minProbabilityMultiple, maxSymb
             # Check for complete segmentations
             segmentation = list(prefix) + list(segmentation)
             #print("candidateSegmentation=", segmentation)
-            if checkForStrokeCompleteSegmentation(segmentation, strokeIdToStroke, subsetIdToSubset):
+            if checkForStrokeCompleteSegmentation(segmentation, strokeIdToStroke, subsetIdToSubset, strokeIdToSubsetId, subsetIdToPredictedSymbolValid, subsetIdToPredictedSymbol):
                 #print("segmentation=", segmentation)
                 segmentationSets.append(segmentation)
 
@@ -489,6 +631,7 @@ def chooseBestSegmentation(segmentationSets, subsetIdToPredictedSymbol, subsetId
         score = 0.0
         for subsetIdentifier in segmentation:
             # Junk symbol predictions are replaced with Valid symbol predictions
+            #print("DEBUG: subsetIdentifier=", subsetIdentifier, ", in=", subsetIdentifier in subsetIdToPredictedSymbol.keys(), ", type=", type(subsetIdentifier))
             if subsetIdToPredictedSymbol[subsetIdentifier] == "junk":
                 if len(subsetIdToSubset[subsetIdentifier]) > 1:
                     # Multiple strokes!
@@ -516,24 +659,15 @@ def chooseBestSegmentation(segmentationSets, subsetIdToPredictedSymbol, subsetId
     return bestSegmentation
 
 # Method to create a label graph (.lg) output file for the given segmentation
-def generateLabelGraphOutputFile(filename, outputDir,segmentation, subsetIdToPredictedSymbol, subsetIdToPredictedSymbolValid, subsetIdToSubset):
+def generateLabelGraphOutputFile(filename, segmentation, subsetIdToPredictedSymbol, subsetIdToPredictedSymbolValid, subsetIdToSubset):
     # Calculate filename prefix
     prefix = filename.split(".inkml")[0]
 
     # Output filename
     outputFilename = prefix + ".lg"
-    print( outputFilename.split('/')[2:])
-    dirPath = outputFilename.split('/')[2:-1]
-    filePath = outputFilename.split('/')[-1]
-    outputDirList = outputDir+'/'.join(dirPath)
-    outputFilename = outputDirList+"/"+filePath
     print("outputFilename=", outputFilename)
-    # outputFilename = outputDir+outputFilename
-    if not os.path.exists(outputDirList):
-        os.makedirs(outputDirList)
+
     outputFile = open(outputFilename, "w+")
-
-
 
     # Use dictionary as symbol counter
     symbolToCount = dict()
@@ -562,14 +696,16 @@ def generateLabelGraphOutputFile(filename, outputDir,segmentation, subsetIdToPre
     return
 
 # Helper method to perform segmentation using the provided tuning parameters
-def segment_helper(fileList, outputDir, mode, maxDistance, maxStrokesPerSymbol, maxWidth, maxHeight, multiStrokeBonusProbability, maxSymbols, minProbabilitySingle, minProbabilityMultiple):
+def segment_helper(fileList, mode, maxDistance, maxStrokesPerSymbol, maxWidth, maxHeight, multiStrokeBonusProbability, maxSymbols, minProbabilitySingle, minProbabilityMultiple):
 
     # Load up the models we will use for classification (from Project 1 deliverables)
     rf, encoderModel = loadModels("encoder_both_rf.pkl", "pickle_both_rf.pkl")
     valid_rf, valid_encoderModel = loadModels("encoder_rf.pkl", "pickle_rf.pkl")
 
+    # Speed enhancement: Don't recompute combination lists
+    strokeCountToSetSizeToCombinations = dict()
+
     for filename in fileList:
-        print("Segmenting ", filename.strip())
 
         # Setup some lookups that will be used for processing this file
         subsetIdToPredictedSymbol = dict()
@@ -579,9 +715,10 @@ def segment_helper(fileList, outputDir, mode, maxDistance, maxStrokesPerSymbol, 
 
         # Parse inkml file
         strokeIdToStroke, gt_strokeIdToSymbolId, gt_symbolIdToSymbol = extractStrokes(filename.strip(), mode)
+        print("Segmenting ", filename.strip(), ", # Strokes =", len(strokeIdToStroke.keys()))
 
         # Calculates unique partitions of strokes
-        uniquePartitionsByStrokeIds, strokeIdToSubsetId, strokeIdToSubset = getUniquePartitionsOfStrokes(strokeIdToStroke, maxDistance, maxStrokesPerSymbol, maxWidth, maxHeight)
+        uniquePartitionsByStrokeIds, strokeIdToSubsetId, strokeIdToSubset = getUniquePartitionsOfStrokes(strokeCountToSetSizeToCombinations, strokeIdToStroke, maxDistance, maxStrokesPerSymbol, maxWidth, maxHeight)
 
         # Passes unique partitions of strokes to classifier to get symbols and probabilities, remembering them
         for subsetIdentifier in range(0, len(uniquePartitionsByStrokeIds)):
@@ -599,6 +736,7 @@ def segment_helper(fileList, outputDir, mode, maxDistance, maxStrokesPerSymbol, 
 
             subsetIdToPredictedSymbol[subsetIdentifier] = predictedSymbol
             subsetIdToProbability[subsetIdentifier] = probability
+            #print("PredictedSymbol[", subsetIdentifier, "] = ", predictedSymbol)
 
             # Classify this subset of strokes using the valid symbols only classifier
             predictedSymbol, probability = classifyStrokeSubset(featureStack, valid_rf, valid_encoderModel)
@@ -614,15 +752,15 @@ def segment_helper(fileList, outputDir, mode, maxDistance, maxStrokesPerSymbol, 
         segmentation = chooseBestSegmentation(segmentationSets, subsetIdToPredictedSymbol, subsetIdToProbability, subsetIdToProbabilityValid, subsetIdToSubset, multiStrokeBonusProbability)
 
         # Generates .lg output file using symbols and stroke ids
-        generateLabelGraphOutputFile(filename, outputDir,segmentation, subsetIdToPredictedSymbol, subsetIdToPredictedSymbolValid, subsetIdToSubset)
+        generateLabelGraphOutputFile(filename, segmentation, subsetIdToPredictedSymbol, subsetIdToPredictedSymbolValid, subsetIdToSubset)
 
     return
 
 # Segments the given input file, producing an .lg file as output using a baseline segmentation approach
-def real_segment(fileList, outputDir,mode):
+def real_segment(fileList, mode):
     # Tuning parameters
-    maxDistance = 10                    # Relative to min-max scaler of all strokes to maxWidth and maxHeight
-    maxStrokesPerSymbol = 4             # No specific support identified for the true upper limit for this
+    maxDistance = 20                    # Relative to min-max scaler of all strokes to maxWidth and maxHeight
+    maxStrokesPerSymbol = 5             # No specific support identified for the true upper limit for this
     maxWidth = 100                      # Min-Max scaler centroid x coordinates (0, maxWidth)
     maxHeight = 100                     # Min-Max scaler centroid y coordinates (0, maxHeight)
     multiStrokeBonusProbability = 0.75  # Bonus probability added to real probability before applying length multiplier
@@ -631,7 +769,7 @@ def real_segment(fileList, outputDir,mode):
     minProbabilityMultiple = 0.40 #0.50 # Threshold for eliminating subsets (containing multiple strokes) with weak probabilities
     #maxSymbolToStrokeRatio = 0.75      # Threshold for limiting max symbols to no more than this ratio against Stroke count
 
-    segment_helper(fileList, outputDir ,mode,
+    segment_helper(fileList, mode,
                    maxDistance=maxDistance,
                    maxStrokesPerSymbol=maxStrokesPerSymbol,
                    maxWidth=maxWidth,
@@ -643,7 +781,7 @@ def real_segment(fileList, outputDir,mode):
     return
 
 # Segments the given input file, producing an .lg file as output using a baseline segmentation approach
-def baseline_segment(fileList, outputDir,mode):
+def baseline_segment(fileList, mode):
     # Tuning parameters
     maxDistance = 5                     # Relative to min-max scaler of all strokes to maxWidth and maxHeight
     maxStrokesPerSymbol = 2             # No specific support identified for the true upper limit for this
@@ -654,7 +792,7 @@ def baseline_segment(fileList, outputDir,mode):
     minProbabilitySingle = 0.00         # Threshold for eliminating subsets (containing 1 stroke) with weak probabilities
     minProbabilityMultiple = 0.00       # Threshold for eliminating subsets (containing multiple strokes) with weak probabilities
 
-    segment_helper(fileList,outputDir ,mode,
+    segment_helper(fileList, mode,
                    maxDistance=maxDistance,
                    maxStrokesPerSymbol=maxStrokesPerSymbol,
                    maxWidth=maxWidth,
@@ -686,7 +824,7 @@ def main():
 
     # Initialize the file list
     fileList = []
-    outputDir = './predict_lg/'
+
     # Extract the first parameter
     firstParameter = sys.argv[1]
     if firstParameter == "real" or firstParameter == "baseline":
@@ -695,8 +833,6 @@ def main():
         else:
             mode = "baseline"
         inputFile = sys.argv[2]
-        # path to directory to save output .lg. use the format /<dir>/
-        outputDir = sys.argv[3]
         fileList = open(inputFile).readlines()
     else:
         fileList.append(sys.argv[1].strip())
@@ -706,10 +842,10 @@ def main():
 
     # Segment the input files
     if mode == "real":
-        real_segment(fileList,outputDir, mode)
+        real_segment(fileList, mode)
     if mode == "baseline":
         print("Using baseline segmenter.")
-        baseline_segment(fileList,outputDir, mode)
+        baseline_segment(fileList, mode)
 
     return
 
