@@ -717,6 +717,11 @@ def segment_helper(fileList, mode, maxDistance, maxStrokesPerSymbol, maxWidth, m
         strokeIdToStroke, gt_strokeIdToSymbolId, gt_symbolIdToSymbol = extractStrokes(filename.strip(), mode)
         print("Segmenting ", filename.strip(), ", # Strokes =", len(strokeIdToStroke.keys()))
 
+        # Skip any file that has zero strokes
+        if len(strokeIdToStroke.keys()) == 0:
+            print("File has no strokes, nothing to do, so going to skip it.")
+            continue
+
         # Calculates unique partitions of strokes
         uniquePartitionsByStrokeIds, strokeIdToSubsetId, strokeIdToSubset = getUniquePartitionsOfStrokes(strokeCountToSetSizeToCombinations, strokeIdToStroke, maxDistance, maxStrokesPerSymbol, maxWidth, maxHeight)
 
