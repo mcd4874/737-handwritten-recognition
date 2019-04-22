@@ -817,13 +817,11 @@ def main():
     # Print usage...
     if(len(sys.argv) < 2):
         print("Usage:")
-        print("  segmenter.py [real|baseline>] <inputFile>")
+        print("  segmenter.py <real|baseline> <inputFile>")
         print("")
         print("  <real|baseline>  Optional: Specify 'real' to use sophisticated segmenter on a list of files, OR...")
         print("                             Specify 'baseline' to use baseline segmenter on a list of files")
-        print("  <inputFile>      When NOT real or baseline, an .inkml file to be segmented to produce ")
-        print("                             an .lg file with the same filename prefix.")
-        print("                   When real or baseline, a file containing a list of files.")
+        print("  <inputFile>      Either an .inkml file to be segmented or a file containing a list of .inkml files ")
         print("")
         return
 
@@ -837,10 +835,15 @@ def main():
             mode = "real"
         else:
             mode = "baseline"
-        inputFile = sys.argv[2]
-        fileList = open(inputFile).readlines()
+
+        # Determine if we are processing an individual file or file list
+        if ".inkml" in sys.argv[2]:
+            fileList.append(sys.argv[2].strip())
+        else:
+            inputFile = sys.argv[2]
+            fileList = open(inputFile).readlines()
     else:
-        fileList.append(sys.argv[1].strip())
+        return
 
     # Print the fileList and mode
     print("mode=", mode, ", fileList=", fileList)

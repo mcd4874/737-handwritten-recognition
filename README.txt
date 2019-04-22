@@ -1,9 +1,40 @@
 README.txt
 
-CSCI-737 Project 1
+CSCI-737 Project 2
 Authors: William Duong and Eric Hartman
 
-Files:
+Project 2 Files & Updates:
+--------------------------
+datasplit.py                    - Splits the dataset into a 70% train and 30% test split by using
+                                  a greedy algorithm that builds up these splits by minimizing variance.
+
+                                  Usage:
+                                    datasplit.py <inputFile> <trainFile> <testFile>
+
+                                    <inputFile> contains a list of .inkml filenames with full paths
+                                    <trainFile> will contain a list of files for the train split
+                                    <testFile> will contain a list of files for the test split
+
+segmenter.py                    - Performs segmentation on the inputFile by applying either our
+                                  sophisticated segmenter ("real") or the baseline segmenter ("baseline") to
+                                  produce a label graph output file.  Places these output .lg files in the
+                                  same path as the source .inkml files
+
+                                  Usage:
+                                    segmenter.py <real|baseline> <inputFile>
+
+                                    <real|baseline>  Optional: Specify 'real' to use sophisticated segmenter on a list of files, OR...
+                                                               Specify 'baseline' to use baseline segmenter on a list of files
+                                    <inputFile>      Either an .inkml file to be segmented or a file containing a list of .inkml files
+
+generateFeatureStack.py (       - Updated since Project 1 to incorporate additional features used by classifier.
+generateNormalizedImages_v2.py  - Updated since Project 1 to incorporate additional features used by classifier.
+testClassifiers_v2.py           - Updated since Project 1 to incorporate additional features used by classifier.
+trainClassifiers.py             - Updated since Project 1 to incorporate additional features used by classifier.
+
+
+Project 1 Files:
+----------------
 generateBalancedClasses.py      - Constructs train/test splits of ground truth files
                                 - Training split is in format consumed by generateNormalizedImages_v2.py
                                 - Test split is in format consumed by testClassifiers_v2.py
@@ -90,5 +121,28 @@ How to rebuild the classifier models?
     After running these three programs, all of the required models will have been built and the environment
     will be ready for testClassifiers_v2.py to run test datasets.
 
+How to perform train/test split?
+    Prerequisite: A file is created that contains the listing of all .inkml files in the complete dataset.
+    This can be constructed through usage of ls & cat unix commands.
+
+    To perform the 70/30 train/test split, run the following:
+    # datasplit.py allfiles.out trainfiles.out testfiles.out
+
+    After running, the "trainfiles.out" will contain the list of inkml files for the train dataset and
+    the "testfiles.out" will contain the list of inkml files for the test dataset.
+
+How to segment a particular inkml file?
+    You only need to run the segment.py as documented above.
+
+    For example, to segment a file named "./Train/inkml/all/2009213-137-177.inkml":
+    # segment.py real ./Train/inkml/all/2009213-137-177.inkml
+
+    This will produce an output file: ./Train/inkml/all/2009213-137-177.lg
+
+How to segment a list of inkml file?
+    You only need to run the segment.py as documented above.
+
+    For example, to segment a list of .inkml files contained in a file named "testfiles.out":
+    # segment.py real testfiles.out
 
 
