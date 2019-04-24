@@ -83,7 +83,7 @@ def calculateDistance(trainHistogram, testHistogram):
     return distance
 
 # Calculates the variance of the ratio of symbol distributions between train vs (train and test)
-def calculateVariance(trainHistogram, testHistogram):
+def calculateVariance(trainHistogram, testHistogram, mean):
     ratios = []
 
     # Construct a union of the keys for both histograms
@@ -98,7 +98,10 @@ def calculateVariance(trainHistogram, testHistogram):
         ratios.append(ratio)
 
     # Calculate the varaince of our ratios
-    variance = np.var(ratios)
+    SSD = 0.0
+    for ratio in ratios:
+        SSD += (ratio - mean)*(ratio - mean)
+    variance = SSD / float(len(ratios))
 
     return variance
 
@@ -144,44 +147,21 @@ def greedySplit(inputFile, trainFile, testFile):
         trainHistogramNext = addFileToHistogramCopy(trainHistogram, filename)
         testHistogramNext = addFileToHistogramCopy(testHistogram, filename)
 
-        # Calculate the distances from current to possible future states
-        # as a ratio of future state "train" / "train + test"
-        trainNextDistance = calculateDistance(trainHistogramNext, testHistogram)
-        testNextDistance = calculateDistance(trainHistogram, testHistogramNext)
+        # Choose split based on minimizing variance...
+        trainNextVariance = calculateVariance(trainHistogramNext, testHistogram, 0.70)
+        testNextVariance = calculateVariance(trainHistogram, testHistogramNext, 0.70)
 
-        # Calculate the train and test errors (70% is target ratio for train vs total)
-        trainNextError = abs(trainNextDistance - 0.70)
-        testNextError = abs(testNextDistance - 0.70)
-
-        # Determine if error is wide enough to use as primary factor...
-        if trainNextError > 0.01 or testNextError > 0.01:
-            # Greedily choose winner as the one leading to lowest error
-            if trainNextError < testNextError:
-                # Add to Train
-                trainHistogram = trainHistogramNext
-                trainOutput.write("" + filename + "\n")
-                print("Distance = ", trainNextDistance)
-            else:
-                # Add to Test
-                testHistogram = testHistogramNext
-                testOutput.write("" + filename + "\n")
-                print("Distance = ", testNextDistance)
+        # Greedily choose winner as the one leading to lowest variance
+        if trainNextVariance < testNextVariance:
+            # Add to Train
+            trainHistogram = trainHistogramNext
+            trainOutput.write("" + filename + "\n")
+            print("Variance = ", trainNextVariance)
         else:
-            # Choose split based on minimizing variance...
-            trainNextVariance = calculateVariance(trainHistogramNext, testHistogram)
-            testNextVariance = calculateVariance(trainHistogram, testHistogramNext)
-
-            # Greedily choose winner as the one leading to lowest variance
-            if trainNextVariance < testNextVariance:
-                # Add to Train
-                trainHistogram = trainHistogramNext
-                trainOutput.write("" + filename + "\n")
-                print("Variance = ", trainNextVariance)
-            else:
-                # Add to Test
-                testHistogram = testHistogramNext
-                testOutput.write("" + filename + "\n")
-                print("Variance = ", testNextVariance)
+            # Add to Test
+            testHistogram = testHistogramNext
+            testOutput.write("" + filename + "\n")
+            print("Variance = ", testNextVariance)
 
     # Close the output files
     testOutput.close()
